@@ -5,8 +5,8 @@ Run against the MIMIQ cloud::
     python examples/sampling.py
 
 The example builds a two-qubit entangling circuit, samples it through
-:class:`mimiq_qiskit.MimiqSamplerV2`, and prints the measurement counts —
-which should concentrate on ``00`` and ``11`` for a Bell state.
+:class:`mimiq_qiskit.MimiqSamplerV2`, and prints the measurement counts,
+which concentrate on ``00`` and ``11`` for a Bell state.
 """
 
 from qiskit import QuantumCircuit

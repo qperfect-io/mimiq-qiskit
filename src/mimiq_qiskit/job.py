@@ -1,8 +1,8 @@
 """Qiskit ``JobV1`` returned by :meth:`MimiqBackend.run`.
 
 The job executes in a background thread so ``backend.run`` returns
-immediately and ``job.result()`` is the blocking call — matching the
-Qiskit Aer / IBMQ provider conventions. Cancellation is not supported:
+immediately and ``job.result()`` is the blocking call, matching the
+Qiskit Aer and IBM provider conventions. Cancellation is not supported:
 the MIMIQ client does not yet expose a ``stopExecution`` endpoint, so
 ``cancel`` raises rather than pretending to abort the remote job.
 """

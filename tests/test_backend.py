@@ -1,6 +1,6 @@
 """Backend end-to-end test using a stub runner.
 
-Avoids touching the real MIMIQ cloud — the stub fabricates a
+Avoids touching the real MIMIQ cloud; the stub fabricates a
 ``QCSResults`` so we can verify the ``backend.run -> job.result ->
 counts`` path without a server round-trip.
 """
@@ -17,7 +17,7 @@ from mimiq_qiskit import MimiqBackend, MimiqProvider
 
 
 def _stub_runner(circuit, *, nsamples, seed):
-    """Return a deterministic QCSResults — half '00', half '11'."""
+    """Return a deterministic QCSResults: half '00', half '11'."""
     nq = max(circuit.num_qubits(), 1)
     nb = max(circuit.num_bits(), nq)
     half = nsamples // 2
@@ -150,7 +150,7 @@ def test_batch_submitted_as_single_job():
     qc_b.measure([0, 1], [0, 1])
 
     result = backend.run([qc_a, qc_b], shots=7).result()
-    # One execute call carrying both circuits — not one job per circuit.
+    # One execute call carrying both circuits, not one job per circuit.
     assert len(rec.calls) == 1
     assert rec.calls[0][0] == 2
     assert rec.calls[0][1] == 7

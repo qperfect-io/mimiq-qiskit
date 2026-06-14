@@ -1,21 +1,20 @@
 Wrapping any MIMIQ backend
 ==========================
 
-``MimiqBackend`` is happy to wrap anything that produces a MIMIQ
-``QCSResults``. There are three accepted shapes for the constructor
-argument:
+``MimiqBackend`` wraps anything that produces a MIMIQ ``QCSResults``.
+There are three accepted shapes for the constructor argument:
 
 1. **A MIMIQ ``RemoteConnection``** (e.g. ``MimiqConnection``). Wrapped
    internally in ``mimiqcircuits.backends.MimiqRemoteBackend`` so the
    polling and result post-processing already in mimiqcircuits is
    reused.
 
-2. **A MIMIQ ``Backend`` instance** — any class inheriting from
-   ``mimiqcircuits.backends.Backend``. Used as-is via its ``execute``
+2. **A MIMIQ ``Backend`` instance**, any class inheriting from
+   ``mimiqcircuits.backends.Backend``. Used as is via its ``execute``
    method.
 
-3. **A plain callable** ``(circuit, *, nsamples, seed) -> QCSResults``.
-   Escape hatch for custom executors or tests.
+3. **A plain callable** ``(circuit, *, nsamples, seed) -> QCSResults``,
+   an escape hatch for custom executors or tests.
 
 Example: wrapping a local in-process simulator
 ----------------------------------------------

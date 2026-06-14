@@ -1,4 +1,4 @@
-"""Converter unit tests — no MIMIQ backend required."""
+"""Converter unit tests; no MIMIQ backend required."""
 
 from __future__ import annotations
 

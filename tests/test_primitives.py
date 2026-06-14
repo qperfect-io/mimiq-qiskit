@@ -1,8 +1,8 @@
 """Tests for the native MIMIQ Sampler/Estimator V2 primitives.
 
 These use stub runners that fabricate ``QCSResults`` so the tests cover
-the primitive plumbing — bitstring packing, register/observable
-broadcasting, result shapes — without a MIMIQ server. The numerical
+the primitive plumbing (bitstring packing, register/observable
+broadcasting, result shapes) without a MIMIQ server. The numerical
 physics (sampling distributions, expectation values) is MIMIQ's own,
 exercised by its test suite; here we verify the conversion is faithful.
 """

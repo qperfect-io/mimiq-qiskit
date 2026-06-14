@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-06-14
+
+### Docs
+- Reviewed docstrings, comments, and documentation for clarity. Fixed the
+  from-source install path and the `mimiqcircuits` version listed in the
+  installation docs.
+
 ## [0.1.0] — 2026-06-14
 
 ### Added

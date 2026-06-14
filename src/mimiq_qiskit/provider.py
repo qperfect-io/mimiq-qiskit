@@ -1,8 +1,8 @@
 """Lightweight provider that enumerates :class:`MimiqBackend` instances
 for a given MIMIQ connection or local runner.
 
-Qiskit 2.x removed the abstract ``Provider`` class — providers are now
-plain Python objects exposing ``backends()`` and ``get_backend(name)``.
+Qiskit 2.x removed the abstract ``Provider`` class; a provider is now a
+plain Python object exposing ``backends()`` and ``get_backend(name)``.
 :class:`MimiqProvider` follows that pattern.
 """
 
@@ -14,7 +14,7 @@ from mimiq_qiskit.backend import MimiqBackend
 
 
 class MimiqProvider:
-    """Enumerate ``MimiqBackend`` flavours over a single runner.
+    """Expose the MIMIQ backend for a single connection or runner.
 
     Example::
 

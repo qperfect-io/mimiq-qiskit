@@ -1,7 +1,7 @@
 [project]
 name = "mimiq-qiskit"
-version = "0.1.0"
-description = "Qiskit BackendV2 bridge for MIMIQ — run Qiskit circuits on MIMIQ cloud or local MIMIQ simulators."
+version = "0.1.1"
+description = "Qiskit BackendV2 bridge for MIMIQ: run Qiskit circuits on MIMIQ cloud or local MIMIQ simulators."
 readme = "README.md"
 authors = [{ name = "QPerfect", email = "technical@qperfect.io" }]
 license = { text = "Apache-2.0" }

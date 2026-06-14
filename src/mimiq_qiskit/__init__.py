@@ -2,14 +2,14 @@
 
 Public surface:
 
-- :class:`MimiqBackend` — Qiskit ``BackendV2`` that runs circuits on a
+- :class:`MimiqBackend`: Qiskit ``BackendV2`` that runs circuits on a
   MIMIQ cloud connection or any local ``mimiqcircuits`` backend.
-- :class:`MimiqJob` — Qiskit ``JobV1`` returned by ``backend.run``.
-- :class:`MimiqProvider` — convenience entry point that lists the
+- :class:`MimiqJob`: Qiskit ``JobV1`` returned by ``backend.run``.
+- :class:`MimiqProvider`: convenience entry point that lists the
   available MIMIQ backends for a given connection.
-- :class:`MimiqSamplerV2`, :class:`MimiqEstimatorV2` — native Qiskit V2
-  primitives that sample / estimate directly on MIMIQ.
-- :func:`qiskit_to_mimiq`, :func:`mimiq_to_qiskit` — low-level circuit
+- :class:`MimiqSamplerV2`, :class:`MimiqEstimatorV2`: native Qiskit V2
+  primitives that sample or estimate directly on MIMIQ.
+- :func:`qiskit_to_mimiq`, :func:`mimiq_to_qiskit`: low-level circuit
   converters, exposed for users who want to bypass the backend wrapper.
 """
 

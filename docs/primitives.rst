@@ -1,21 +1,20 @@
 Primitives
 ==========
 
-Qiskit's V2 primitives are the recommended way to run sampling and
-expectation-value workloads. ``mimiq-qiskit`` ships **native**
+Qiskit's V2 primitives are the standard interface for sampling and
+expectation-value workloads. ``mimiq-qiskit`` ships native
 implementations that talk to MIMIQ directly, rather than relying on
 Qiskit's generic ``BackendSamplerV2`` / ``BackendEstimatorV2`` wrappers.
 
-Two things make the native primitives worthwhile:
+The native primitives differ from the generic wrappers in two ways:
 
 - :class:`~mimiq_qiskit.MimiqEstimatorV2` computes expectation values
-  **exactly** using MIMIQ's expectation-value engine. The generic
-  estimator estimates them by sampling in rotated measurement bases;
-  MIMIQ evaluates :math:`\langle \psi | H | \psi \rangle` directly, so
-  there is no shot noise and the reported standard deviation is zero.
+  exactly using MIMIQ's expectation-value engine. The generic estimator
+  estimates them by sampling in rotated measurement bases; MIMIQ
+  evaluates :math:`\langle \psi | H | \psi \rangle` directly, so there is
+  no shot noise and the reported standard deviation is zero.
 - Both primitives submit every circuit in a pub (one per parameter
-  binding) as a **single** MIMIQ job, instead of one round-trip per
-  circuit.
+  binding) as a single MIMIQ job, instead of one round trip per circuit.
 
 Sampling
 --------

@@ -7,7 +7,7 @@ Run against the MIMIQ cloud::
 Unlike Qiskit's generic estimator, :class:`mimiq_qiskit.MimiqEstimatorV2`
 evaluates the observable directly with MIMIQ's expectation-value engine,
 so the result carries no shot noise. This example sweeps a rotation angle
-and prints ``<Z>`` at each point — a cosine curve — using a single
+and prints ``<Z>`` at each point (a cosine curve) using a single
 parameterised circuit and one batched submission.
 """
 

@@ -1,16 +1,16 @@
 """Conversion from :class:`mimiqcircuits.QCSResults` to a Qiskit
 :class:`qiskit.result.Result`.
 
-The remote MIMIQ service returns a list of ``QCSResults`` — one per
+The remote MIMIQ service returns a list of ``QCSResults``, one per
 submitted circuit. The mapping is:
 
-- ``QCSResults.cstates`` (list of ``bitarray``, one per shot) →
-  Qiskit ``counts`` (``{hex: int}`` histogram).
+- ``QCSResults.cstates`` (a list of ``bitarray``, one per shot) becomes
+  the Qiskit ``counts`` histogram (``{hex: int}``).
 - Each ``cstate`` is indexed by classical bit position: index ``i`` is
   the value of clbit ``i``, matching Qiskit's LSB-first convention for
   the hex integer key.
-- Timings and fidelities are forwarded as ``metadata`` so users who
-  want them can still reach them via ``result.results[0].metadata``.
+- Timings and fidelities are forwarded as ``metadata``, reachable via
+  ``result.results[0].metadata``.
 """
 
 from __future__ import annotations
@@ -50,8 +50,8 @@ def qcsresults_to_qiskit_result(
     """Bundle a list of ``QCSResults`` into a single Qiskit ``Result``.
 
     ``qiskit_circuits`` is the parallel list of source ``QuantumCircuit``
-    instances — needed for ``memory_slots`` and ``creg_sizes`` so
-    ``result.get_counts(circuit)`` lookup works.
+    instances. They supply ``memory_slots`` and ``creg_sizes`` so that
+    ``result.get_counts(circuit)`` lookups work.
     """
     results = []
     for qcs, qc in zip(qcs_results, qiskit_circuits):

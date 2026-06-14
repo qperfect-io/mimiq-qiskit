@@ -1,16 +1,16 @@
 """Native Qiskit V2 primitives backed by MIMIQ.
 
 Qiskit ships generic ``BackendSamplerV2`` / ``BackendEstimatorV2`` that
-wrap any ``BackendV2``, but its own docs recommend a native primitive
-when the provider can do better — and MIMIQ can:
+wrap any ``BackendV2``. Its own documentation recommends a native
+primitive when the provider can do better, which MIMIQ can:
 
 - :class:`MimiqSamplerV2` reads MIMIQ's sampled bitstrings (``cstates``)
   directly into per-register :class:`~qiskit.primitives.containers.BitArray`,
-  skipping the counts/hex round-trip the generic sampler needs.
-- :class:`MimiqEstimatorV2` evaluates observables **exactly** with
-  MIMIQ's expectation-value engine (``Circuit.push_expval``) instead of
-  estimating them from measurement samples. No shot noise, and it scales
-  to large circuits on the MPS backend.
+  skipping the counts/hex round trip the generic sampler needs.
+- :class:`MimiqEstimatorV2` evaluates observables exactly with MIMIQ's
+  expectation-value engine (``Circuit.push_expval``) instead of
+  estimating them from measurement samples. This avoids shot noise and
+  scales to large circuits on the MPS backend.
 
 Both batch every circuit in a pub (one per parameter binding) into a
 single MIMIQ submission.
@@ -217,10 +217,9 @@ class MimiqEstimatorV2(BaseEstimatorV2):
         for idx in indices:
             mc_circ = qiskit_to_mimiq(bound_b[idx])
             ham = _observable_to_hamiltonian(obs_b[idx], num_qubits)
-            # push_expval appends one ExpectationValue per term, scales by
-            # the coefficient, and sums them into the first z-register —
-            # so the full observable lands in z[0] of an otherwise
-            # z-register-free circuit.
+            # push_expval sums the coefficient-scaled terms into the first
+            # z-register, so the full observable lands in z[0] of an
+            # otherwise z-register-free circuit, read back below.
             mc_circ.push_expval(ham, *range(num_qubits))
             mimiq_circuits.append(mc_circ)
 

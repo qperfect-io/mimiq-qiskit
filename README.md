@@ -8,20 +8,20 @@
 [MIMIQ](https://qperfect.io).
 
 A drop-in Qiskit `BackendV2` that lets Qiskit users submit circuits to
-the MIMIQ cloud — or to any local MIMIQ simulator — without leaving the
+the MIMIQ cloud, or to any local MIMIQ simulator, without leaving the
 Qiskit ecosystem. Build your circuits with `QuantumCircuit`, hand them
 to a `MimiqBackend`, get back a familiar `qiskit.result.Result`.
 
 Highlights:
 
-- **`MimiqBackend`** — a `BackendV2` covering the standard gate set,
+- **`MimiqBackend`**: a `BackendV2` covering the standard gate set,
   arbitrary `UnitaryGate`s, and single-gate mid-circuit conditionals.
   A batch of circuits is submitted as a single MIMIQ job.
-- **`MimiqSamplerV2` / `MimiqEstimatorV2`** — native Qiskit V2
-  primitives. The estimator computes expectation values **exactly** with
+- **`MimiqSamplerV2` / `MimiqEstimatorV2`**: native Qiskit V2
+  primitives. The estimator computes expectation values exactly with
   MIMIQ's expectation-value engine, with no shot noise.
 - MIMIQ-specific run options (`bonddim`, `entdim`, `timelimit`,
-  `noisemodel`, …) pass straight through `backend.run(...)`.
+  `noisemodel`, and more) pass straight through `backend.run(...)`.
 
 ## Repository layout
 
@@ -33,9 +33,9 @@ mimiq-qiskit/
 └── tests/       # Pytest suite
 ```
 
-Qiskit is Python-only, so this repo has no Julia side — the package
-lives at the repo root rather than under a nested
-``mimiq-qiskit-python/`` directory.
+Qiskit is Python-only, so this repo has no Julia side; the package lives
+at the repo root rather than under a nested `mimiq-qiskit-python/`
+directory.
 
 ## Quick start
 
@@ -61,8 +61,8 @@ print(counts)
 ```
 
 Local MIMIQ simulators (anything implementing the
-`mimiqcircuits.backends.Backend` interface) wrap the same way — pass
-the backend instance instead of a connection:
+`mimiqcircuits.backends.Backend` interface) wrap the same way; pass the
+backend instance instead of a connection:
 
 ```python
 from mimiq_qiskit import MimiqBackend
@@ -74,7 +74,7 @@ backend = MimiqBackend(MyLocalBackend())
 ### Primitives
 
 Prefer the native primitives for sampling and expectation values. The
-estimator is exact — no shot noise:
+estimator is exact, with no shot noise:
 
 ```python
 from qiskit import QuantumCircuit

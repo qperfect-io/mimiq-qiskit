@@ -13,8 +13,8 @@ from typing import Callable, Sequence
 import mimiqcircuits as mc
 
 
-# Qiskit name → factory(params) returning a MIMIQ operation.
-# Params arrive as a list of floats (or symbolic floats — see converter).
+# Qiskit name to a factory(params) returning a MIMIQ operation.
+# Params arrive as a list of floats already resolved by the converter.
 QISKIT_TO_MIMIQ: dict[str, Callable[[Sequence[float]], mc.Operation]] = {
     # ── single-qubit, no params ────────────────────────────────────────
     "id": lambda p: mc.GateID(),

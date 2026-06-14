@@ -4,18 +4,20 @@ Coverage:
 
 - All standard gates from :data:`mimiq_qiskit.gate_map.QISKIT_TO_MIMIQ`.
 - ``Measure``, ``Reset``, ``Barrier``.
-- ``UnitaryGate`` (Qiskit ``"unitary"``) → :class:`mimiqcircuits.GateCustom`,
-  so arbitrary matrix gates (state preparation, custom ansätze) pass
-  through without a manual decomposition.
-- ``IfElseOp`` (mid-circuit measurement feed-forward) → MIMIQ
+- ``UnitaryGate`` (Qiskit ``"unitary"``) maps to
+  :class:`mimiqcircuits.GateCustom`, so arbitrary matrix gates (state
+  preparation, custom ansätze) pass through without a manual
+  decomposition.
+- ``IfElseOp`` (mid-circuit measurement feed-forward) maps to
   :class:`mimiqcircuits.IfStatement`, for the common case of a single
   conditional gate with no ``else`` branch.
 - Multi-register circuits: qubits and clbits are flattened in the order
   Qiskit assigns them on the circuit, so the resulting MIMIQ circuit
   uses 0-based indexing matching ``circuit.find_bit(q).index``.
-- Global phase is dropped: it has no effect on measurement statistics or
-  expectation values, the only quantities this bridge computes.
-- Free :class:`qiskit.circuit.Parameter` references are not resolved —
+- Global phase is dropped, because it does not affect measurement
+  statistics or expectation values, the only quantities this bridge
+  computes.
+- Free :class:`qiskit.circuit.Parameter` references are not resolved;
   bind them with ``QuantumCircuit.assign_parameters`` before conversion.
 
 Unknown gates raise :class:`UnsupportedGateError` with the Qiskit name,
@@ -39,9 +41,9 @@ class UnsupportedGateError(NotImplementedError):
 def _resolve_param(p) -> float:
     """Coerce a Qiskit parameter into a float.
 
-    Symbolic ``Parameter`` references are not supported — bind them
-    before conversion. This guard exists so the error surfaces here, not
-    deep inside a MIMIQ gate constructor.
+    Symbolic ``Parameter`` references are not supported; bind them before
+    conversion. The guard surfaces the error here rather than deep inside
+    a MIMIQ gate constructor.
     """
     try:
         return float(p)
@@ -55,8 +57,9 @@ def _resolve_param(p) -> float:
 def _gate_for(name: str, params: Sequence[float]) -> mc.Operation:
     """Return the MIMIQ gate for a plain Qiskit gate ``name``.
 
-    Only covers unitary gates from the gate map — not measure/reset/
-    barrier/unitary/control-flow, which the caller handles separately.
+    Only covers unitary gates from the gate map, not measure, reset,
+    barrier, unitary, or control flow, which the caller handles
+    separately.
     """
     factory = QISKIT_TO_MIMIQ.get(name)
     if factory is None:

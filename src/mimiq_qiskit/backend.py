@@ -2,22 +2,23 @@
 
 :class:`MimiqBackend` accepts any of:
 
-- a :class:`mimiqcircuits.RemoteConnection` / ``MimiqConnection`` — the
-  cloud path. Wrapped in :class:`mimiqcircuits.backends.MimiqRemoteBackend`
-  so its capabilities, limits, and execute semantics carry over.
-- a :class:`mimiqcircuits.backends.Backend` instance — any local or
-  remote MIMIQ simulator. The backend is used as-is.
-- a plain callable ``(circuit, *, nsamples, seed) -> QCSResults`` —
+- a :class:`mimiqcircuits.RemoteConnection` / ``MimiqConnection`` for the
+  cloud path. It is wrapped in
+  :class:`mimiqcircuits.backends.MimiqRemoteBackend` so its capabilities,
+  limits, and execute semantics carry over.
+- a :class:`mimiqcircuits.backends.Backend` instance (any local or remote
+  MIMIQ simulator), used as is.
+- a plain callable ``(circuit, *, nsamples, seed) -> QCSResults``, an
   escape hatch for custom executors and tests.
 
-A whole batch of circuits is submitted to MIMIQ in a **single** job (MIMIQ
-natively accepts a list of circuits and returns a list of results), so
-``backend.run([qc1, qc2, ...])`` is one round-trip rather than one per
+A batch of circuits is submitted to MIMIQ in a single job, because MIMIQ
+accepts a list of circuits and returns a list of results. So
+``backend.run([qc1, qc2, ...])`` is one round trip rather than one per
 circuit.
 
-The ``Target`` it advertises lists the gates the converter understands;
-``transpile(qc, backend=mimiq_backend)`` will decompose unsupported gates
-into that set before they reach the converter.
+The advertised ``Target`` lists the gates the converter understands, so
+``transpile(qc, backend=mimiq_backend)`` decomposes unsupported gates into
+that set before they reach the converter.
 """
 
 from __future__ import annotations
@@ -99,8 +100,8 @@ def _build_target(num_qubits: int) -> Target:
     """Register supported gates on an all-to-all Target.
 
     Passing ``properties=None`` for each ``add_instruction`` tells the
-    transpiler the gate is available on every qubit / qubit pair with
-    no calibration data — sufficient for a software-simulator backend.
+    transpiler the gate is available on every qubit or qubit pair with no
+    calibration data, which is what a software simulator needs.
     """
     target = Target(num_qubits=num_qubits, description="MIMIQ simulator")
 
@@ -133,8 +134,8 @@ def _build_target(num_qubits: int) -> Target:
 
     target.add_instruction(Measure(), properties=None)
     target.add_instruction(Reset(), properties=None)
-    # Barriers are passed through the transpiler regardless of Target —
-    # no need to register them here.
+    # Barriers pass through the transpiler regardless of the Target, so
+    # registering them here would be redundant.
 
     return target
 
@@ -202,7 +203,7 @@ class MimiqBackend(BackendV2):
             ``(circuit, *, nsamples, seed) -> QCSResults`` callable.
         name: Backend name reported to Qiskit. Defaults to ``"mimiq"``.
         num_qubits: Qubit count advertised on the ``Target``. The MIMIQ
-            cloud handles much more — bump this when transpiling wide
+            cloud handles many more; raise this when transpiling wide
             circuits against the backend.
         description: Human-readable backend description.
 
@@ -273,6 +274,18 @@ class MimiqBackend(BackendV2):
     # ── run ────────────────────────────────────────────────────────────
 
     def run(self, run_input, **options) -> MimiqJob:
+        """Convert and submit one circuit or a list of circuits to MIMIQ.
+
+        Args:
+            run_input: A ``QuantumCircuit`` or an iterable of them.
+            **options: ``shots`` and ``seed``, plus any of the
+                MIMIQ-specific run options listed on the class. Options
+                set here override the backend defaults for this call.
+
+        Returns:
+            A :class:`MimiqJob` running the whole batch as one MIMIQ job;
+            call ``job.result()`` to block for the ``qiskit.result.Result``.
+        """
         from qiskit import QuantumCircuit  # local import keeps import cost low
 
         if isinstance(run_input, QuantumCircuit):
