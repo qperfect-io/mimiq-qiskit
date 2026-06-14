@@ -1,0 +1,95 @@
+# mimiq-qiskit CI
+#
+# Stages:
+# - test: pytest on every push to main/devel and every MR.
+# - docs: Sphinx HTML build on every push to main/devel and every MR;
+#         published as a GitLab Pages site from main.
+# - publish: on a vX.Y.Z tag, build the wheel + sdist and upload them
+#            to the GitLab project's PyPI registry.
+
+stages:
+  - test
+  - docs
+  - publish
+
+variables:
+  MIMIQCIRCUITS_REF: "devel"
+
+# ── shared anchors ─────────────────────────────────────────────────────────
+
+.add-mimiqcircuits-python: &add-mimiqcircuits-python
+  - uv add --no-sync "mimiqcircuits @ git+https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.qperfect.io/development/mimiq/mimiqcircuits-python.git@${MIMIQCIRCUITS_REF}"
+
+# ── test ───────────────────────────────────────────────────────────────────
+
+test-python:
+  stage: test
+  image: python:3.13
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "devel"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - pip install uv
+  script:
+    - *add-mimiqcircuits-python
+    - uv sync
+    - uv run pytest -sxv
+
+# ── docs ───────────────────────────────────────────────────────────────────
+
+docs-build:
+  stage: docs
+  image: python:3.13
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "devel"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - pip install uv
+  script:
+    - *add-mimiqcircuits-python
+    - uv sync --group docs
+    - uv run sphinx-build -W -b html docs docs/_build/html
+  artifacts:
+    paths:
+      - docs/_build/html
+    expire_in: 1 week
+
+# GitLab Pages publishing — picks up the docs build and exposes it at
+# the project's Pages URL. Only fires on main so devel builds stay
+# private to the CI artifact viewer.
+pages:
+  stage: docs
+  image: python:3.13
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  before_script:
+    - pip install uv
+  script:
+    - *add-mimiqcircuits-python
+    - uv sync --group docs
+    - uv run sphinx-build -W -b html docs public
+  artifacts:
+    paths:
+      - public
+
+# ── publish ────────────────────────────────────────────────────────────────
+
+publish-python:
+  stage: publish
+  image: python:3.13
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
+  before_script:
+    - pip install uv twine
+  script:
+    - *add-mimiqcircuits-python
+    - uv sync
+    - uv build
+    # --skip-existing lets re-runs of a tag pipeline succeed when the
+    # wheel was already uploaded on a previous attempt.
+    - >
+      TWINE_PASSWORD=${CI_JOB_TOKEN}
+      TWINE_USERNAME=gitlab-ci-token
+      twine upload --skip-existing
+      --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi
+      dist/*

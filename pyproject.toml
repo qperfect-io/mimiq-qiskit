@@ -1,0 +1,43 @@
+[project]
+name = "mimiq-qiskit"
+version = "0.1.0"
+description = "Qiskit BackendV2 bridge for MIMIQ — run Qiskit circuits on MIMIQ cloud or local MIMIQ simulators."
+readme = "README.md"
+authors = [{ name = "QPerfect", email = "technical@qperfect.io" }]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "mimiqcircuits>=0.24",
+    "qiskit>=2.0",
+    "numpy>=1.24",
+]
+
+# Note: no `[tool.uv.sources]` override here. The public build and CI must
+# resolve `mimiqcircuits` from PyPI. The private GitLab CI injects an
+# unreleased build with `uv add --no-sync "mimiqcircuits @ git+…"`; for
+# local monorepo development against the sibling checkout, run e.g.
+# `uv add --editable ../mimiqcircuits-python` (kept out of version control).
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+]
+docs = [
+    "sphinx>=7.3,<9",
+    "furo>=2024.1",
+    "sphinx-autodoc-typehints>=2.0",
+]
+
+[project.urls]
+Homepage = "https://gitlab.qperfect.io/development/mimiq/mimiq-qiskit"
+Repository = "https://gitlab.qperfect.io/development/mimiq/mimiq-qiskit"
+
+[project.entry-points."qiskit.transpiler.translation"]
+# Reserved for future translation plugin hooks.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"

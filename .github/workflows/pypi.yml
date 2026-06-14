@@ -1,0 +1,32 @@
+name: PyPI
+
+# Publishes to PyPI when a release tag (vX.Y.Z) is pushed to the public
+# repository. Private tags (vX.Y.Z-private) never reach the public remote
+# and would not match this pattern anyway. The PYPI_API_TOKEN secret holds
+# a PyPI project token.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  publish:
+    if: github.repository == 'qperfect-io/mimiq-qiskit'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish --token "${{ secrets.PYPI_API_TOKEN }}"
