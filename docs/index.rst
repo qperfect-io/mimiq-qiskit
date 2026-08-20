@@ -11,7 +11,9 @@ MIMIQ simulator), and receive a familiar ``qiskit.result.Result``.
 
    installation
    quickstart
+   local_simulation
    primitives
+   conversion
    wrapping_local_backends
 
 .. toctree::

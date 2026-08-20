@@ -60,6 +60,15 @@ def _register_bitarray(qcs_list, shape, clbit_indices, reg_size, shots):
 
     for i, qcs in enumerate(qcs_list):
         cstates = qcs.cstates
+        # A BitArray has a fixed shot axis, so a runner that returns a
+        # different number of samples than asked for cannot be packed into
+        # it. Say so, rather than reading off the end of the list.
+        if len(cstates) < shots:
+            raise ValueError(
+                f"MIMIQ returned {len(cstates)} samples for circuit {i} "
+                f"but {shots} shots were requested; the sampler cannot "
+                "pack a short result"
+            )
         for s in range(shots):
             cstate = cstates[s]
             value = 0

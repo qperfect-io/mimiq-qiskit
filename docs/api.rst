@@ -32,6 +32,12 @@ circuits into a single MIMIQ submission.
 Converters
 ----------
 
+See :doc:`conversion` for what each direction accepts.
+
 .. autofunction:: qiskit_to_mimiq
 
 .. autofunction:: mimiq_to_qiskit
+
+.. autoexception:: mimiq_qiskit.converter.UnsupportedGateError
+
+.. autofunction:: mimiq_qiskit.gate_map.supported_qiskit_names

@@ -17,11 +17,17 @@ Highlights:
 - **`MimiqBackend`**: a `BackendV2` covering the standard gate set,
   arbitrary `UnitaryGate`s, and single-gate mid-circuit conditionals.
   A batch of circuits is submitted as a single MIMIQ job.
+- **Wide conversion coverage**: named gates map directly, controlled
+  gates become a native MIMIQ `Control`, and anything else is decomposed
+  through its own Qiskit definition — so `initialize`, `to_gate()`
+  blocks, and the rest of the standard library convert without a manual
+  decomposition.
 - **`MimiqSamplerV2` / `MimiqEstimatorV2`**: native Qiskit V2
   primitives. The estimator computes expectation values exactly with
   MIMIQ's expectation-value engine, with no shot noise.
-- MIMIQ-specific run options (`bonddim`, `entdim`, `timelimit`,
-  `noisemodel`, and more) pass straight through `backend.run(...)`.
+- MIMIQ-specific run options (`fuse`, `canonicaldecompose`, `bonddim`,
+  `entdim`, `timelimit`, `noisemodel`, and more) pass straight through
+  `backend.run(...)`.
 
 ## Repository layout
 
@@ -62,13 +68,14 @@ print(counts)
 
 Local MIMIQ simulators (anything implementing the
 `mimiqcircuits.backends.Backend` interface) wrap the same way; pass the
-backend instance instead of a connection:
+backend instance instead of a connection. [`mimiq-exaqt`](https://pypi.org/project/mimiq-exaqt/)
+is a state-vector simulator on PyPI, so this needs no credentials:
 
 ```python
+from exaqt import ExaqtQCS
 from mimiq_qiskit import MimiqBackend
-from somewhere import MyLocalBackend
 
-backend = MimiqBackend(MyLocalBackend())
+backend = MimiqBackend(ExaqtQCS(), num_qubits=24)
 ```
 
 ### Primitives
@@ -93,7 +100,8 @@ print(result[0].data.evs)
 ```
 
 See `examples/sampling.py` and `examples/expectation_values.py` for
-runnable scripts.
+runnable scripts, or `examples/local_simulation.py` to run without cloud
+credentials.
 
 ## Installation
 
@@ -110,6 +118,12 @@ uv sync             # install dev environment
 uv run pytest -sxv  # run the test suite
 uv build            # build wheel + sdist
 ```
+
+The suite simulates against `mimiq-exaqt`, installed by `uv sync` as a
+dev dependency, and compares results to Qiskit's own `Statevector`. Every
+mapped gate is checked that way, because a mis-mapped gate or a dropped
+qubit-ordering convention produces a well-formed but wrong result that
+stubs and conversion round trips cannot see.
 
 ### Repositories and releases
 

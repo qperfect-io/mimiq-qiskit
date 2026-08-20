@@ -1,15 +1,33 @@
 [project]
 name = "mimiq-qiskit"
-version = "0.1.1"
+version = "0.2.0"
 description = "Qiskit BackendV2 bridge for MIMIQ: run Qiskit circuits on MIMIQ cloud or local MIMIQ simulators."
 readme = "README.md"
 authors = [{ name = "QPerfect", email = "technical@qperfect.io" }]
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
+# Every bound is closed at the next version semantic versioning allows a
+# breaking change in, so an incompatible release fails to resolve instead
+# of failing at runtime. For a `0.y.z` dependency that boundary is the
+# minor, because 0.x makes no promise across minors; from 1.0.0 on it is
+# the major (`>=2.0,<3`).
+#
+# `mimiqcircuits` earned that treatment: 0.26.7 turned `GateCustom.matrix`
+# back into a method in a patch release, which broke this package while
+# the constraint still claimed to accept it.
+#
+# The range spans two minors because the suite has been run against both.
+# 0.27's one new operation, `GateCustomDiagonal`, is covered by the
+# reverse converter's matrix fallback (see the tests named for it), and
+# it is what `fuse_circuit` now emits for an all-diagonal block. Widen a
+# bound only after the suite has run against the new version, in the
+# release that does so, and never on the strength of resolution alone.
 dependencies = [
-    "mimiqcircuits>=0.24",
-    "qiskit>=2.0",
-    "numpy>=1.24",
+    "mimiqcircuits>=0.26.7,<0.28",
+    "qiskit>=2.0,<3",
+    # Matching the range mimiqcircuits itself declares, since it owns this
+    # compatibility claim and its floor of 1.26 is what actually resolves.
+    "numpy>=1.26,<3",
 ]
 
 # Note: no `[tool.uv.sources]` override here. The public build and CI must
@@ -17,15 +35,19 @@ dependencies = [
 # unreleased build with `uv add --no-sync "mimiqcircuits @ git+…"`; for
 # local monorepo development against the sibling checkout, run e.g.
 # `uv add --editable ../mimiqcircuits-python` (kept out of version control).
+# Either way the declared bound above no longer applies, which is the
+# point of those jobs: they are the early warning for the next bump.
 
 [dependency-groups]
 dev = [
-    "pytest>=8.2",
+    "mimiq-exaqt>=0.2,<0.3",
+    "pytest>=9,<10",
 ]
 docs = [
-    "sphinx>=7.3,<9",
+    "sphinx>=8,<9",
+    "sphinx-autodoc-typehints>=3,<4",
+    # Date-versioned, so there is no breaking boundary to close at.
     "furo>=2024.1",
-    "sphinx-autodoc-typehints>=2.0",
 ]
 
 [project.urls]
@@ -39,5 +61,8 @@ Repository = "https://gitlab.qperfect.io/development/mimiq/mimiq-qiskit"
 testpaths = ["tests"]
 
 [build-system]
-requires = ["uv_build>=0.10.2,<0.11.0"]
+# Same rule, and this one was already wrong: the declared range excluded
+# the uv actually running the build, which warns on every `uv build`. CI
+# installs a matching uv so the claim stays true.
+requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"

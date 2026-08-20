@@ -3,6 +3,9 @@ name: Test
 # Public-repo CI: runs the test suite on pushes to the synced branches and
 # on pull requests. The MIMIQ dependency resolves from PyPI here (the
 # private GitLab CI overrides it with a git ref for cross-repo testing).
+#
+# `uv sync` installs the dev group, which brings in `mimiq-exaqt` so the
+# simulation tests run rather than skipping.
 
 on:
   push:
@@ -26,6 +29,10 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
+          # Kept inside the range build-system.requires declares, so the
+          # backend that builds the wheel is the one pyproject names.
+          # setup-uv documents exact versions, not ranges. Bump with it.
+          version: "0.11.6"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
@@ -36,6 +43,15 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-extras
+
+      - name: Report the resolved MIMIQ versions
+        run: |
+          uv run python -c "
+          import importlib.metadata as m
+          for p in ('mimiqcircuits', 'mimiq-exaqt', 'qiskit'):
+              try: print(p, m.version(p))
+              except m.PackageNotFoundError: print(p, 'MISSING')
+          "
 
       - name: Run tests
         run: uv run pytest -sxv

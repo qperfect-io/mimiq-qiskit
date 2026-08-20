@@ -61,6 +61,10 @@ QISKIT_TO_MIMIQ: dict[str, Callable[[Sequence[float]], mc.Operation]] = {
     "ryy": lambda p: mc.GateRYY(p[0]),
     "rzz": lambda p: mc.GateRZZ(p[0]),
     "rzx": lambda p: mc.GateRZX(p[0]),
+    "r": lambda p: mc.GateR(p[0], p[1]),
+    "xx_plus_yy": lambda p: mc.GateXXplusYY(p[0], p[1]),
+    "xx_minus_yy": lambda p: mc.GateXXminusYY(p[0], p[1]),
+    "iswap_dg": lambda p: mc.GateISWAPDG(),
     # ── three-qubit ────────────────────────────────────────────────────
     "ccx": lambda p: mc.GateCCX(),
     "toffoli": lambda p: mc.GateCCX(),
@@ -98,7 +102,9 @@ from qiskit.circuit.library import (  # noqa: E402
     ECRGate,
     HGate,
     IGate,
+    MCPhaseGate,
     PhaseGate,
+    RGate,
     RXGate,
     RXXGate,
     RYGate,
@@ -115,6 +121,8 @@ from qiskit.circuit.library import (  # noqa: E402
     TGate,
     UGate,
     XGate,
+    XXMinusYYGate,
+    XXPlusYYGate,
     YGate,
     ZGate,
     iSwapGate,
@@ -163,15 +171,26 @@ MIMIQ_TO_QISKIT: dict[type, tuple[Callable[..., object], int]] = {
     mc.GateCCX: (CCXGate, 0),
     mc.GateCSWAP: (CSwapGate, 0),
     mc.GateC3X: (C3XGate, 0),
+    mc.GateR: (RGate, 2),
+    mc.GateXXplusYY: (XXPlusYYGate, 2),
+    mc.GateXXminusYY: (XXMinusYYGate, 2),
+    # ``MCPhaseGate`` needs its control count alongside the angle.
+    mc.GateCCP: (lambda lam: MCPhaseGate(lam, 2), 1),
+    mc.GateISWAPDG: (lambda: iSwapGate().inverse(), 0),
 }
 
 
+# Handled by the converter itself rather than through the gate map.
+_CONVERTER_BUILTINS = frozenset(
+    {"measure", "reset", "barrier", "delay", "unitary", "global_phase", "if_else"}
+)
+
+
 def supported_qiskit_names() -> set[str]:
-    """Names of Qiskit operations the converter recognises directly."""
-    return set(QISKIT_TO_MIMIQ.keys()) | {
-        "measure",
-        "reset",
-        "barrier",
-        "unitary",
-        "if_else",
-    }
+    """Names of Qiskit operations the converter recognises directly.
+
+    Not the limit of what it converts: an unlisted gate is decomposed
+    through its own Qiskit ``definition``, so anything the standard
+    library builds from these primitives converts too.
+    """
+    return set(QISKIT_TO_MIMIQ) | set(_CONVERTER_BUILTINS)

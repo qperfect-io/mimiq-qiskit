@@ -51,3 +51,27 @@ Pass a list of circuits to run them in one submission:
 
    result = backend.run([qc_a, qc_b, qc_c], shots=2000).result()
    counts_a = result.get_counts(0)
+
+MIMIQ run options
+-----------------
+
+``run`` forwards MIMIQ-specific options that have no Qiskit equivalent.
+Circuit preparation happens before the state is evolved:
+
+- ``fuse`` / ``fuse_threshold`` — merge runs of adjacent unitary gates
+  into wider blocks, skipping circuits narrower than the threshold.
+- ``canonicaldecompose`` — decompose the circuit to MIMIQ's canonical
+  gate basis.
+- ``reorderqubits``, ``remove_swaps`` — cloud-only layout passes.
+
+The rest tune the simulator or the job itself: ``bonddim``, ``entdim``,
+``mpscutoff``, ``mpsmethod``, ``mpotraversal`` for the MPS engine, plus
+``timelimit``, ``noisemodel``, and ``label``.
+
+.. code-block:: python
+
+   job = backend.run(qc, shots=1000, fuse=True, bonddim=256)
+
+Options left unset are not sent, so MIMIQ applies its own defaults. Note
+that a local ``mimiqcircuits`` backend accepts only the preparation
+knobs; passing a cloud-only option to one raises ``TypeError``.

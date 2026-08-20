@@ -19,12 +19,30 @@ There are three accepted shapes for the constructor argument:
 Example: wrapping a local in-process simulator
 ----------------------------------------------
 
+``mimiq-exaqt`` is a state-vector simulator on PyPI whose ``ExaqtQCS`` is
+a ``mimiqcircuits`` ``LocalBackend``, so it needs no cloud credentials:
+
 .. code-block:: python
 
+   from exaqt import ExaqtQCS
    from mimiq_qiskit import MimiqBackend
-   from somewhere import MyLocalBackend  # subclass of mimiqcircuits.backends.Backend
 
-   backend = MimiqBackend(MyLocalBackend(), name="my-local")
+   backend = MimiqBackend(ExaqtQCS(), name="exaqt", num_qubits=24)
+
+Any other class inheriting from ``mimiqcircuits.backends.Backend`` wraps
+the same way. :doc:`local_simulation` works this example through the whole
+API — counts, both primitives, mid-circuit measurement, transpilation, and
+a check against Qiskit's own reference.
+
+Run options are not portable across backends
+--------------------------------------------
+
+MIMIQ backends do not all take the same options. The cloud accepts every
+knob; a local simulator names only what it implements, so
+``backend.run(qc, bonddim=64)`` against ``ExaqtQCS`` raises a
+``ValueError`` naming the backend and the option rather than failing
+somewhere inside mimiqcircuits. Set MPS and job options only on backends
+that have them.
 
 Example: a stub for unit tests
 ------------------------------

@@ -2,13 +2,17 @@
 
 These use stub runners that fabricate ``QCSResults`` so the tests cover
 the primitive plumbing (bitstring packing, register/observable
-broadcasting, result shapes) without a MIMIQ server. The numerical
-physics (sampling distributions, expectation values) is MIMIQ's own,
-exercised by its test suite; here we verify the conversion is faithful.
+broadcasting, result shapes) without a MIMIQ server, including the shapes
+a real backend would never produce.
+
+``tests/test_simulation.py`` covers the same primitives against a real
+simulator, where sampled distributions and expectation values are checked
+against Qiskit's own reference.
 """
 
 from __future__ import annotations
 
+import pytest
 from bitarray import bitarray
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter
@@ -154,3 +158,24 @@ def test_sampler_accepts_raw_runner():
     qc.measure(0, 0)
     counts = sampler.run([qc], shots=4).result()[0].data.c.get_counts()
     assert counts == {"1": 4}
+
+def test_sampler_rejects_a_short_result():
+    """A BitArray has a fixed shot axis, so a short result cannot be
+    packed into it; the sampler must say so rather than read off the end
+    of the sample list."""
+
+    def short_runner(circuit, *, nsamples, seed):
+        return QCSResults(
+            simulator="stub",
+            version="0",
+            cstates=[bitarray("0" * max(circuit.num_bits(), 1))
+                     for _ in range(nsamples // 2)],
+            timings={},
+        )
+
+    qc = QuantumCircuit(2, 2)
+    qc.measure([0, 1], [0, 1])
+
+    sampler = MimiqSamplerV2(MimiqBackend(short_runner))
+    with pytest.raises(ValueError, match="returned 5 samples"):
+        sampler.run([qc], shots=10).result()

@@ -163,12 +163,18 @@ def test_run_options_forwarded_to_mimiq():
     qc = QuantumCircuit(1, 1)
     qc.measure(0, 0)
 
-    backend.run(qc, shots=5, bonddim=16, timelimit=30).result()
+    backend.run(
+        qc, shots=5, bonddim=16, timelimit=30, fuse=True, fuse_threshold=4
+    ).result()
     kwargs = rec.calls[0][3]
     assert kwargs["bonddim"] == 16
     assert kwargs["timelimit"] == 30
+    # Circuit-preparation knobs travel the same path.
+    assert kwargs["fuse"] is True
+    assert kwargs["fuse_threshold"] == 4
     # Unset options are not forwarded.
     assert "noisemodel" not in kwargs
+    assert "canonicaldecompose" not in kwargs
 
 
 def test_backend_target_lists_standard_gates():

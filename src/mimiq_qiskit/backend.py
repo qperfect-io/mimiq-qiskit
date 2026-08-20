@@ -83,8 +83,15 @@ from mimiq_qiskit.job import MimiqJob
 _DEFAULT_NUM_QUBITS = 64
 
 # Execution knobs forwarded to MIMIQ ``execute`` when set (non-``None``).
-# These are MIMIQ-specific and have no Qiskit equivalent.
+# These are MIMIQ-specific and have no Qiskit equivalent. The first group
+# are circuit-preparation passes MIMIQ runs before evolving; the rest are
+# simulator and job settings.
 _RUN_OPTION_KEYS = (
+    "fuse",
+    "fuse_threshold",
+    "canonicaldecompose",
+    "reorderqubits",
+    "remove_swaps",
     "bonddim",
     "entdim",
     "mpscutoff",
@@ -179,6 +186,26 @@ def _coerce_runner(runner: Any) -> Callable:
     )
 
 
+def _rejected_options(execute, opts: dict) -> list[str]:
+    """Which of ``opts`` the ``execute`` callable would refuse.
+
+    MIMIQ backends do not accept a uniform option set: the cloud takes
+    every knob through ``**kwargs``, while a local simulator names only
+    the ones it implements. Checking the signature first turns an opaque
+    ``TypeError: got an unexpected keyword argument`` from deep inside
+    mimiqcircuits into an error that names the backend and the option.
+    """
+    import inspect
+
+    try:
+        params = inspect.signature(execute).parameters
+    except (TypeError, ValueError):  # builtins and C extensions
+        return []
+    if any(p.kind is p.VAR_KEYWORD for p in params.values()):
+        return []
+    return [k for k in opts if k not in params]
+
+
 def _backend_runner(backend) -> Callable:
     """Wrap a MIMIQ backend so a list of circuits is submitted as one job.
 
@@ -187,6 +214,13 @@ def _backend_runner(backend) -> Callable:
     """
     def call(circuits, *, nsamples, seed, **opts):
         kwargs = {k: v for k, v in opts.items() if v is not None}
+        rejected = _rejected_options(backend.execute, kwargs)
+        if rejected:
+            raise ValueError(
+                f"{type(backend).__name__} does not accept the run "
+                f"option(s) {', '.join(sorted(rejected))}; they are "
+                "specific to other MIMIQ backends"
+            )
         results = backend.execute(
             list(circuits), nsamples=nsamples, seed=seed, **kwargs
         )
@@ -208,9 +242,11 @@ class MimiqBackend(BackendV2):
         description: Human-readable backend description.
 
     Beyond ``shots`` and ``seed``, ``run`` accepts MIMIQ-specific options
-    (``bonddim``, ``entdim``, ``mpscutoff``, ``mpsmethod``,
-    ``mpotraversal``, ``timelimit``, ``noisemodel``, ``label``) which are
-    forwarded to MIMIQ when set.
+    which are forwarded to MIMIQ when set: the circuit-preparation knobs
+    ``fuse``, ``fuse_threshold``, ``canonicaldecompose``,
+    ``reorderqubits``, ``remove_swaps``, and the simulator/job settings
+    ``bonddim``, ``entdim``, ``mpscutoff``, ``mpsmethod``,
+    ``mpotraversal``, ``timelimit``, ``noisemodel``, ``label``.
     """
 
     def __init__(

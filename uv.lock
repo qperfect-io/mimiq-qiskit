@@ -418,8 +418,23 @@ wheels = [
 ]
 
 [[package]]
+name = "mimiq-exaqt"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mimiqcircuits" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/43/05a439cc1052aa231bfd92629e68848fd9ab16af66ad809bf37699c2cfea/mimiq_exaqt-0.2.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:17a61741b6cfa4ef830836140f6d96f68bf37c4a342548e08dcfa1fa94cd7e04", size = 1377894, upload-time = "2026-08-07T07:03:31.502Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/b0/1d9a8d77d0321f32e5ac15893e19da262b27b260fdd3c079630517b055f6/mimiq_exaqt-0.2.0-cp310-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:25fe6be9473648ef9a9c132749801811ff460d112fda6fa194de763fbd725836", size = 1497068, upload-time = "2026-08-07T07:05:05.125Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/a6/0e2f0a0d43284bf7f135acf63751fcfe4bcf845c384b525887b8baadd56c/mimiq_exaqt-0.2.0-cp310-abi3-win_amd64.whl", hash = "sha256:9fdc82777b79c166bba06103d245b8ed30df82c203e45635ffb747d32296e487", size = 1330403, upload-time = "2026-08-07T07:03:14.579Z" },
+]
+
+[[package]]
 name = "mimiq-qiskit"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "mimiqcircuits" },
@@ -430,6 +445,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mimiq-exaqt" },
     { name = "pytest" },
 ]
 docs = [
@@ -442,22 +458,25 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mimiqcircuits", specifier = ">=0.24" },
-    { name = "numpy", specifier = ">=1.24" },
-    { name = "qiskit", specifier = ">=2.0" },
+    { name = "mimiqcircuits", specifier = ">=0.26.7,<0.28" },
+    { name = "numpy", specifier = ">=1.26,<3" },
+    { name = "qiskit", specifier = ">=2.0,<3" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.2" }]
+dev = [
+    { name = "mimiq-exaqt", specifier = ">=0.2,<0.3" },
+    { name = "pytest", specifier = ">=9,<10" },
+]
 docs = [
     { name = "furo", specifier = ">=2024.1" },
-    { name = "sphinx", specifier = ">=7.3,<9" },
-    { name = "sphinx-autodoc-typehints", specifier = ">=2.0" },
+    { name = "sphinx", specifier = ">=8,<9" },
+    { name = "sphinx-autodoc-typehints", specifier = ">=3,<4" },
 ]
 
 [[package]]
 name = "mimiqcircuits"
-version = "0.24.2"
+version = "0.26.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bitarray" },
@@ -471,9 +490,9 @@ dependencies = [
     { name = "sympy" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/48/2f/ec37be6d77536228694d3f5f3ab06ee229006bce3dba27a02430e021b376/mimiqcircuits-0.24.2.tar.gz", hash = "sha256:63410ebca2c6eb61e6033c93537e3a0c9151b2d1cdc5aaa8f122719e8a9b98a0", size = 912074, upload-time = "2026-05-31T23:24:47.309Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/04/c8f69f9587fd8dc2f8a8d71f679a126937614ac86cbc4170eea3596e5221/mimiqcircuits-0.26.7.tar.gz", hash = "sha256:bb009471d7c851f84a74cf29958589ccf153f0d280927cf8d0249bced037396d", size = 2615136, upload-time = "2026-08-18T12:16:44.575Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/9b/adb2e6f36c945639cf962e72db6571e07d44dcf2ce98dacc10905013cd23/mimiqcircuits-0.24.2-py3-none-any.whl", hash = "sha256:b8a850738bdc67ce580babc0572fcb12281e446bf514262d3e89993488bb5f6b", size = 423815, upload-time = "2026-05-31T23:24:48.651Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/5c/9bd3757d2227223536743401e5d9e0ef6c3c5b1fe51f18944b4a5a1de89b/mimiqcircuits-0.26.7-py3-none-any.whl", hash = "sha256:4878a04d72c2355bfdb2b183a7fde15322b64898347eb255e07292ff054b7576", size = 437818, upload-time = "2026-08-18T12:16:46.065Z" },
 ]
 
 [[package]]
