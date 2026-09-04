@@ -124,9 +124,9 @@ you would rather post-process the shots than a histogram.
 Exact expectation values
 ------------------------
 
-:class:`~mimiq_qiskit.MimiqEstimatorV2` does not sample. It hands the
-observable to MIMIQ's expectation-value engine, so the answer carries no
-shot noise and the reported standard deviations are zero:
+:class:`~mimiq_qiskit.MimiqEstimatorV2` does not sample. It reads each
+Pauli term off the state itself, so the answer carries no shot noise and
+the reported standard deviations are zero:
 
 .. code-block:: python
 
@@ -304,9 +304,15 @@ you think:
    MIMIQ  +0.847260207297
    Qiskit +0.847260207297
 
-They agree to machine precision because both are exact — the estimator
+They agree to machine precision because both are exact: the estimator
 does no sampling, so there is no statistical band to allow for. This is
 the check the test suite runs over every gate in the conversion map.
+
+That holds for a circuit ending in a single state, which is every circuit
+on this page. A circuit with a mid-circuit measurement, a reset, or a
+noise model ends in an ensemble instead, and its expectation value is an
+average the estimator has to be given a budget for. See
+:ref:`estimation-methods`.
 
 Moving to the cloud
 -------------------

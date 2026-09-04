@@ -378,6 +378,135 @@ def test_estimator_matches_statevector_expectation():
     np.testing.assert_allclose(float(got), float(want), atol=1e-9)
 
 
+def test_estimator_shots_mode_matches_the_exact_value():
+    """Sampled estimation must land on the exact value within its own error.
+
+    This is the path that emulates Qiskit's ``BackendEstimatorV2``: rotate
+    into each measurement basis, measure, average the eigenvalues. It has to
+    agree with the direct evaluation of the same observable, or one of the
+    two conventions (label endianness, basis rotation, parity) is wrong.
+    """
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(3)
+    _generic_state(qc)
+    qc.cx(0, 1)
+    qc.cx(1, 2)
+
+    observable = SparsePauliOp(
+        ["ZZI", "XXI", "IYZ", "III"], [1.0, 0.5, -0.75, 0.25]
+    )
+    backend = MimiqBackend(_runner(), num_qubits=8)
+
+    exact = MimiqEstimatorV2(backend).run([(qc, observable)]).result()[0]
+    sampled = MimiqEstimatorV2(backend, shots=20000, seed=17).run(
+        [(qc, observable)]
+    ).result()[0]
+
+    error = float(sampled.data.stds)
+    assert error > 0.0
+    assert float(sampled.data.evs) == pytest.approx(
+        float(exact.data.evs), abs=5 * error
+    )
+    assert sampled.metadata["shots"] == 20000
+
+
+def test_estimator_averages_trajectories_to_the_ensemble_value():
+    """A mid-circuit measurement leaves an ensemble, whose average is known.
+
+    ``H`` then a measurement collapses qubit 0 to ``|0⟩`` or ``|1⟩`` with
+    equal probability, and the trailing ``X`` flips it. So ``⟨Z⟩`` is -1 or
+    +1 per trajectory and 0 over the ensemble, while any single trajectory
+    is off by a full unit.
+    """
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(1, 1)
+    qc.h(0)
+    qc.measure(0, 0)
+    qc.x(0)
+
+    backend = MimiqBackend(_runner(), num_qubits=8)
+    result = MimiqEstimatorV2(backend, trajectories=4000, seed=23).run(
+        [(qc, SparsePauliOp(["Z"]))]
+    ).result()[0]
+
+    error = float(result.data.stds)
+    assert error == pytest.approx(1 / math.sqrt(4000), rel=0.2)
+    assert float(result.data.evs) == pytest.approx(0.0, abs=5 * error)
+    assert result.metadata["stochastic"] is True
+    assert result.metadata["exact"] is False
+
+
+def test_estimator_trajectories_and_shots_agree_on_a_noisy_circuit():
+    """The two statistical methods must estimate the same quantity.
+
+    Both target ``Tr(ρO)``. They differ only in variance, so with generous
+    budgets they have to meet.
+    """
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(2, 1)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.measure(0, 0)
+    qc.x(0)
+
+    observable = SparsePauliOp(["ZZ", "IZ"], [1.0, 0.5])
+    backend = MimiqBackend(_runner(), num_qubits=8)
+
+    averaged = MimiqEstimatorV2(backend, trajectories=4000, seed=3).run(
+        [(qc, observable)]
+    ).result()[0]
+    sampled = MimiqEstimatorV2(backend, shots=4000, seed=3).run(
+        [(qc, observable)]
+    ).result()[0]
+
+    spread = math.hypot(float(averaged.data.stds), float(sampled.data.stds))
+    assert float(averaged.data.evs) == pytest.approx(
+        float(sampled.data.evs), abs=5 * spread
+    )
+
+
+def test_estimator_single_trajectory_is_far_from_the_average():
+    """The behaviour the budget requirement exists to prevent.
+
+    Forcing ``method="exact"`` on this circuit returns one branch, which is
+    a full unit away from the ensemble value of 0. Averaging is not a
+    refinement here; a single trajectory is simply a different number.
+    """
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(1, 1)
+    qc.h(0)
+    qc.measure(0, 0)
+    qc.x(0)
+
+    backend = MimiqBackend(_runner(), num_qubits=8)
+    with pytest.warns(UserWarning, match="single random trajectory"):
+        one = MimiqEstimatorV2(backend, method="exact", seed=11).run(
+            [(qc, SparsePauliOp(["Z"]))]
+        ).result()[0]
+
+    assert abs(float(one.data.evs)) == pytest.approx(1.0)
+    assert one.metadata["exact"] is False
+
+
+def test_estimator_reports_the_simulator_fidelity():
+    """Averaging removes the statistical error, not the simulator's own."""
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(2)
+    _generic_state(qc)
+    qc.cx(0, 1)
+
+    result = MimiqEstimatorV2(MimiqBackend(_runner(), num_qubits=8)).run(
+        [(qc, SparsePauliOp(["ZZ"]))]
+    ).result()[0]
+
+    assert result.metadata["min_fidelity"] == pytest.approx(1.0)
+
+
 def test_estimator_pauli_label_order():
     """A Pauli label is qubit-0-right on Qiskit, qubit-0-left on MIMIQ.
 

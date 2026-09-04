@@ -7,13 +7,17 @@ primitive when the provider can do better, which MIMIQ can:
 - :class:`MimiqSamplerV2` reads MIMIQ's sampled bitstrings (``cstates``)
   directly into per-register :class:`~qiskit.primitives.containers.BitArray`,
   skipping the counts/hex round trip the generic sampler needs.
-- :class:`MimiqEstimatorV2` evaluates observables exactly with MIMIQ's
-  expectation-value engine (``Circuit.push_expval``) instead of
-  estimating them from measurement samples. This avoids shot noise and
-  scales to large circuits on the MPS backend.
+- :class:`MimiqEstimatorV2` reads each Pauli term straight off the
+  simulator state instead of estimating it from measurement samples, so a
+  deterministic circuit carries no shot noise at any term weight. A
+  circuit that ends in an ensemble rather than a state (mid-circuit
+  measurement, reset, noise) is averaged over trajectories, and a
+  ``shots`` budget switches it to hardware-style sampled estimation. See
+  :mod:`mimiq_qiskit.estimation` for the three methods.
 
-Both batch every circuit in a pub (one per parameter binding) into a
-single MIMIQ submission.
+Both batch every circuit in a pub into a single MIMIQ submission, and the
+estimator shares one submission between observables that were asked for at
+the same parameter binding.
 """
 
 from __future__ import annotations
@@ -28,7 +32,6 @@ from qiskit.primitives import (
     BaseSamplerV2,
     PrimitiveJob,
     PrimitiveResult,
-    PubResult,
     SamplerPubResult,
 )
 from qiskit.primitives.containers import BitArray, DataBin
@@ -37,6 +40,7 @@ from qiskit.primitives.containers.sampler_pub import SamplerPub
 
 from mimiq_qiskit.backend import MimiqBackend
 from mimiq_qiskit.converter import qiskit_to_mimiq
+from mimiq_qiskit.estimation import EstimatorConfig, estimate_pub
 
 
 def _as_backend(backend) -> MimiqBackend:
@@ -78,34 +82,6 @@ def _register_bitarray(qcs_list, shape, clbit_indices, reg_size, shots):
             flat[i, s, :] = list(value.to_bytes(num_bytes, "big"))
 
     return BitArray(arr, reg_size)
-
-
-def _observable_to_hamiltonian(obs: dict, num_qubits: int) -> mc.Hamiltonian:
-    """Build a MIMIQ ``Hamiltonian`` from a Qiskit observable mapping.
-
-    ``obs`` is ``{pauli_label: coefficient}`` as produced by
-    :meth:`ObservablesArray.coerce`. Qiskit orders Pauli labels with
-    qubit 0 on the right, so the label is reversed to MIMIQ's qubit-0-left
-    convention before being attached to qubits ``0..num_qubits-1``.
-    """
-    ham = mc.Hamiltonian()
-    for label, coeff in obs.items():
-        mimiq_label = label[::-1]
-        ham.push(
-            float(np.real(coeff)),
-            mc.PauliString(mimiq_label),
-            *range(num_qubits),
-        )
-    return ham
-
-
-def _obs_object_array(observables) -> np.ndarray:
-    """Materialise an ``ObservablesArray`` as an object ndarray of dicts,
-    so it broadcasts against the array of bound circuits with numpy."""
-    out = np.empty(observables.shape, dtype=object)
-    for idx in np.ndindex(observables.shape):
-        out[idx] = observables[idx]
-    return out
 
 
 class MimiqSamplerV2(BaseSamplerV2):
@@ -175,32 +151,99 @@ class MimiqSamplerV2(BaseSamplerV2):
 
 
 class MimiqEstimatorV2(BaseEstimatorV2):
-    """``BaseEstimatorV2`` that evaluates observables exactly on MIMIQ.
+    """``BaseEstimatorV2`` that evaluates observables on MIMIQ.
 
-    Each observable is converted to a MIMIQ ``Hamiltonian`` and its
-    expectation value is computed directly (no measurement sampling), so
-    results carry no shot noise and standard deviations are reported as
-    zero.
+    Each Pauli term is evaluated on the simulator state rather than sampled,
+    so a circuit that ends in a definite state gives an exact value at any
+    term weight and reports a standard error of zero.
+
+    A circuit that ends in an *ensemble* has no single exact value: a
+    mid-circuit measurement, a reset, a noise channel, or a server-side
+    ``noisemodel`` makes MIMIQ re-evolve the circuit once per shot, and each
+    trajectory has its own expectation value. The average over trajectories
+    is the density-matrix value, so that is what this reports, with the
+    sample standard error in ``stds``. Reading one trajectory would be
+    unbiased but as noisy as the observable's range, so a stochastic circuit
+    with no budget raises rather than returning it. A ``shots`` budget
+    switches to hardware-style estimation from measurements in rotated
+    bases.
+
+    :mod:`mimiq_qiskit.estimation` documents the three methods and how
+    ``method="auto"`` chooses between them.
 
     Args:
         backend: A :class:`MimiqBackend`, or anything it can wrap.
-        seed: Seed forwarded to MIMIQ. Defaults to the backend's.
+        method: ``"auto"`` (default), ``"exact"``, ``"trajectories"``, or
+            ``"shots"``.
+        trajectories: Trajectories to average for a stochastic circuit.
+            ``None`` sizes it from ``precision``. Ignored for a deterministic
+            circuit, which has one answer.
+        shots: Shots per measurement basis. Giving this selects sampled
+            estimation; ``None`` sizes it from ``precision`` when
+            ``method="shots"``.
+        emulate_shot_noise: Add Gaussian noise of width ``precision`` to an
+            otherwise exact value, as Qiskit's ``StatevectorEstimator`` does.
+            One evolution instead of a shot budget, for code that wants to
+            see plausible shot noise without paying for it.
+        default_precision: Precision for ``run`` calls and pubs that do not
+            carry their own. ``0.0``, meaning "as exact as the simulator
+            gets".
+        seed: Seed forwarded to MIMIQ, and to the ``emulate_shot_noise``
+            generator. Defaults to the backend's.
         run_options: Extra MIMIQ run options merged over the backend's.
+
+    Result metadata reports ``method``, whether the value is ``exact``,
+    whether the run was ``stochastic``, the ``trajectories`` or ``shots``
+    spent, the ``target_precision``, and ``min_fidelity``: the lowest
+    simulator fidelity behind the pub, which on an MPS backend is the
+    truncation error that averaging cannot remove.
     """
 
-    def __init__(self, backend, *, seed=None, run_options=None):
+    def __init__(
+        self,
+        backend,
+        *,
+        method: str = "auto",
+        trajectories: int | None = None,
+        shots: int | None = None,
+        emulate_shot_noise: bool = False,
+        default_precision: float = 0.0,
+        seed=None,
+        run_options=None,
+    ):
         self._backend = _as_backend(backend)
         self._seed = seed if seed is not None else self._backend.options.seed
         self._run_opts = {
             **self._backend._run_options({}),
             **(run_options or {}),
         }
+        self._default_precision = default_precision
+        self._config = EstimatorConfig(
+            method=method,
+            trajectories=trajectories,
+            shots=shots,
+            emulate_shot_noise=emulate_shot_noise,
+            default_precision=default_precision,
+            seed=self._seed,
+            # A noise model applied by the runner never appears in the
+            # circuit, so nothing else can tell that the run is stochastic.
+            assume_stochastic=self._run_opts.get("noisemodel") is not None,
+        )
 
     @property
-    def precision(self) -> float:
-        return 0.0
+    def default_precision(self) -> float:
+        """Precision used when ``run`` is called without one."""
+        return self._default_precision
 
     def run(self, pubs: Iterable, *, precision: float | None = None) -> PrimitiveJob:
+        """Estimate every pub and return the job carrying the results.
+
+        ``precision`` overrides :attr:`default_precision` for this call. A
+        positive value sizes the trajectory or shot budget as
+        ``ceil(1/precision**2)`` where one is needed.
+        """
+        if precision is None:
+            precision = self._default_precision
         coerced = [EstimatorPub.coerce(pub, precision) for pub in pubs]
         job = PrimitiveJob(self._run, coerced)
         job._submit()
@@ -208,39 +251,12 @@ class MimiqEstimatorV2(BaseEstimatorV2):
 
     def _run(self, pubs) -> PrimitiveResult:
         return PrimitiveResult(
-            [self._run_pub(pub) for pub in pubs],
+            [estimate_pub(pub, self._config, self._submit) for pub in pubs],
             metadata={"version": 2},
         )
 
-    def _run_pub(self, pub: EstimatorPub) -> PubResult:
-        circuit = pub.circuit
-        shape = pub.shape
-        num_qubits = circuit.num_qubits
-
-        bound = pub.parameter_values.bind_all(circuit)
-        obs_arr = _obs_object_array(pub.observables)
-        bound_b, obs_b = np.broadcast_arrays(bound, obs_arr)
-
-        indices = list(np.ndindex(shape))
-        mimiq_circuits = []
-        for idx in indices:
-            mc_circ = qiskit_to_mimiq(bound_b[idx])
-            ham = _observable_to_hamiltonian(obs_b[idx], num_qubits)
-            # push_expval sums the coefficient-scaled terms into the first
-            # z-register, so the full observable lands in z[0] of an
-            # otherwise z-register-free circuit, read back below.
-            mc_circ.push_expval(ham, *range(num_qubits))
-            mimiq_circuits.append(mc_circ)
-
-        qcs_list = self._backend._execute_batch(
-            mimiq_circuits, shots=1, seed=self._seed, **self._run_opts
+    def _submit(self, mimiq_circuits, nsamples):
+        """Run one batch of MIMIQ circuits for the shared estimation engine."""
+        return self._backend._execute_batch(
+            mimiq_circuits, shots=nsamples, seed=self._seed, **self._run_opts
         )
-
-        evs = np.zeros(shape, dtype=float)
-        for k, idx in enumerate(indices):
-            zstates = qcs_list[k].zstates
-            value = zstates[0][0] if zstates and zstates[0] else 0.0
-            evs[idx] = float(np.real(value))
-
-        databin = DataBin(evs=evs, stds=np.zeros(shape), shape=shape)
-        return PubResult(databin, metadata={"precision": 0.0, "exact": True})

@@ -23,8 +23,11 @@ Highlights:
   blocks, and the rest of the standard library convert without a manual
   decomposition.
 - **`MimiqSamplerV2` / `MimiqEstimatorV2`**: native Qiskit V2
-  primitives. The estimator computes expectation values exactly with
-  MIMIQ's expectation-value engine, with no shot noise.
+  primitives. The estimator reads each Pauli term off the simulator
+  state, so a deterministic circuit carries no shot noise at any term
+  weight. A circuit that ends in an ensemble (mid-circuit measurement,
+  reset, noise) is averaged over trajectories, and `shots=N` switches to
+  hardware-style sampled estimation.
 - MIMIQ-specific run options (`fuse`, `canonicaldecompose`, `bonddim`,
   `entdim`, `timelimit`, `noisemodel`, and more) pass straight through
   `backend.run(...)`.
@@ -80,8 +83,8 @@ backend = MimiqBackend(ExaqtQCS(), num_qubits=24)
 
 ### Primitives
 
-Prefer the native primitives for sampling and expectation values. The
-estimator is exact, with no shot noise:
+Prefer the native primitives for sampling and expectation values. On a
+deterministic circuit the estimator is exact, with no shot noise:
 
 ```python
 from qiskit import QuantumCircuit

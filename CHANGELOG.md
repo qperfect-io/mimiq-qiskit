@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-04
+
+### Fixed
+- `MimiqEstimatorV2` no longer reports a single trajectory as an exact
+  expectation value. A circuit with a mid-circuit measurement, a reset, or a
+  noise model is re-evolved per shot and each trajectory has its own value;
+  the estimator submitted one shot and returned that one draw with
+  `stds = 0` and `exact: True`. It now averages the trajectories, which is
+  the unbiased estimate of `Tr(rho O)`, and reports the standard error of
+  the mean.
+- A stochastic circuit with no budget raises instead of returning one
+  trajectory. Set `trajectories=N`, `shots=N`, or a positive `precision`;
+  `method="exact"` still reads a single trajectory, with a warning.
+- `MimiqEstimatorV2` drops measurements left at the end of a pub's circuit,
+  as `TensorWeaverEstimator` already did. An estimator pub carries state
+  preparation, not readout, so a trailing measurement would otherwise
+  collapse the state the observable is read from.
+- An identity-only observable returns its coefficient without running
+  anything, instead of submitting a circuit whose result it cannot use.
+- A non-Hermitian observable raises rather than having the imaginary part of
+  its coefficients silently discarded.
+
+### Added
+- `MimiqEstimatorV2(shots=N)` estimates from measurements in rotated Pauli
+  bases, the way hardware and Qiskit's `BackendEstimatorV2` do, for
+  comparing against a shot-based reference. Terms are grouped into
+  qubit-wise commuting sets, so one measurement circuit serves many terms.
+- `MimiqEstimatorV2(trajectories=N)` averages N trajectories, and a positive
+  `precision` sizes either budget as `ceil(1/precision**2)`, Qiskit's
+  convention.
+- `MimiqEstimatorV2(emulate_shot_noise=True)` adds Gaussian noise of width
+  `precision` to an otherwise exact value, as Qiskit's
+  `StatevectorEstimator` does. One evolution instead of a shot budget.
+- `MimiqEstimatorV2(method=...)` forces `"exact"`, `"trajectories"`, or
+  `"shots"` instead of letting `"auto"` choose from the circuit.
+- Estimator result metadata reports `method`, `exact`, `stochastic`, the
+  `trajectories` or `shots` spent, and `min_fidelity`, the lowest simulator
+  fidelity behind the pub. On an MPS backend that is the truncation error,
+  which averaging more trajectories does not reduce.
+- `mimiq_qiskit.estimation` and `mimiq_qiskit.observables`, the estimation
+  engine and the Pauli-observable helpers, so a provider-specific estimator
+  can share one implementation of method resolution, trajectory averaging,
+  and metadata rather than reimplementing them.
+
+### Changed
+- `MimiqEstimatorV2` reads observables through one `ExpectationValue`
+  operation per Pauli term instead of `Circuit.push_expval`. Only a term's
+  own qubits are named, so a weight-2 term on a wide register is a two-qubit
+  operation rather than a full-width Pauli string padded with identities.
+- Observables asked for at the same parameter binding share one submission
+  and one evolution, and a term two of them share is evaluated once. Five
+  observables on one circuit cost one MIMIQ job, not five.
+- Estimator result metadata reports `target_precision` rather than
+  `precision`, matching Qiskit's own estimators.
+- `MimiqEstimatorV2.precision` is replaced by `default_precision`, settable
+  in the constructor, again matching Qiskit's estimators.
+
 ## [0.2.0] — 2026-08-20
 
 ### Added
