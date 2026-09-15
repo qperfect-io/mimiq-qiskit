@@ -58,3 +58,6 @@ averages trajectories, and reports metadata identically.
 
 .. automodule:: mimiq_qiskit.observables
    :members:
+
+.. automodule:: mimiq_qiskit.local_terms
+   :members:

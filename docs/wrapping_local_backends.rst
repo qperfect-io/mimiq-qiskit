@@ -34,6 +34,38 @@ the same way. :doc:`local_simulation` works this example through the whole
 API — counts, both primitives, mid-circuit measurement, transpilation, and
 a check against Qiskit's own reference.
 
+A local backend can be asked for terms directly
+-----------------------------------------------
+
+Shape 2 above is more than a way to avoid the network. A backend that runs
+in this process can be driven one step at a time, and
+``MimiqEstimatorV2`` does exactly that when the backend advertises the
+``expectation_state`` capability: a deterministic circuit is evolved once
+and each Pauli term is read off the resulting state, instead of each term
+being pushed onto the circuit as an ``ExpectationValue`` operation and read
+back out of the z-register.
+
+Nothing about this is opt-in or visible in the values — it is the same
+numbers by a shorter path, and the saving is in the term handling, so it
+counts for most where the terms are many and the state is small. A backend
+that does not advertise the capability, a remote connection, a bare
+callable, and any circuit that needs an evolution per trajectory all take
+the portable route unchanged.
+
+.. code-block:: python
+
+   from exaqt import ExaqtQCS
+   from mimiq_qiskit import MimiqBackend, MimiqEstimatorV2
+
+   "expectation_state" in ExaqtQCS().capabilities()   # True
+   estimator = MimiqEstimatorV2(MimiqBackend(ExaqtQCS()))
+
+To offer this from your own backend, implement
+``expectation(state, op, *qubits)`` — accepting a ``PauliString`` of any
+length, not just a one- or two-qubit operator — and add
+``expectation_state`` to what ``capabilities()`` returns. See
+:mod:`mimiq_qiskit.local_terms` for what the estimator then calls.
+
 Run options are not portable across backends
 --------------------------------------------
 

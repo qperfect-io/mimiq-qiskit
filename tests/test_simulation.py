@@ -604,3 +604,169 @@ def test_noise_channel_has_no_qiskit_form():
 
     with pytest.raises(UnsupportedGateError, match="not unitary"):
         mimiq_to_qiskit(circuit)
+
+
+# ── direct term reads off a local state ────────────────────────────────
+
+
+direct_terms = pytest.mark.skipif(
+    "expectation_state" not in exaqt.ExaqtQCS().capabilities(),
+    reason="the installed exaqt does not advertise expectation_state",
+)
+
+
+def _both_routes(**kwargs):
+    """The same estimator twice, one with the local fast path disabled.
+
+    Everything the fast path is allowed to change is nothing, so every test
+    below runs a pub through both and compares. Disabling it on the second
+    instance is what makes the comparison a comparison: the portable route
+    is otherwise unreachable from a local backend.
+    """
+    direct = MimiqEstimatorV2(MimiqBackend(_runner(), num_qubits=32), **kwargs)
+    assert direct._evaluate is not None
+    pushed = MimiqEstimatorV2(MimiqBackend(_runner(), num_qubits=32), **kwargs)
+    pushed._evaluate = None
+    return direct, pushed
+
+
+def _assert_routes_agree(pubs, **kwargs):
+    direct, pushed = _both_routes(**kwargs)
+    got, want = direct.run(pubs).result(), pushed.run(pubs).result()
+    for a, b in zip(got, want):
+        np.testing.assert_array_equal(a.data.evs, b.data.evs)
+        np.testing.assert_array_equal(a.data.stds, b.data.stds)
+        assert a.metadata == b.metadata
+    return got
+
+
+@direct_terms
+def test_direct_terms_engage_for_a_local_backend():
+    """A local backend that can read its state gets the shorter route."""
+    assert MimiqEstimatorV2(MimiqBackend(_runner()))._evaluate is not None
+
+
+def test_direct_terms_stay_off_for_a_callable_runner():
+    """A bare callable is not a backend, so there is no state to query."""
+
+    def runner(circuit, *, nsamples, seed):
+        raise AssertionError("not called")
+
+    assert MimiqEstimatorV2(MimiqBackend(runner))._evaluate is None
+
+
+@direct_terms
+@pytest.mark.parametrize("nq", [2, 5, 14])
+def test_direct_terms_match_the_pushed_ones(nq):
+    """Same values at any width, including past the qubit-reorder threshold.
+
+    A reorder pass relabels the qubits under the terms' feet. The pushed
+    route rides along with it because its operations are in the circuit; the
+    direct route has to map each term itself, and 14 qubits is where exaqt's
+    reordering starts, so that mapping is live here and nowhere below it.
+    """
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(nq)
+    qc.h(0)
+    for q in range(nq - 1):
+        qc.cx(q, q + 1)
+
+    labels = ["I" * (nq - 1) + "Z", "Z" + "I" * (nq - 1), "Z" * nq, "X" * nq]
+    observable = SparsePauliOp(labels, [1.0, -0.5, 0.25, 2.0])
+
+    got = _assert_routes_agree([(qc, observable)])
+    want = np.real(Statevector(qc).expectation_value(observable))
+    np.testing.assert_allclose(float(got[0].data.evs), float(want), atol=1e-9)
+
+
+@direct_terms
+def test_direct_terms_cover_a_qubit_no_gate_touches():
+    """An observable may be wider than the circuit that prepares the state."""
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(4)
+    qc.h(0)
+    qc.cx(0, 1)
+    # A MIMIQ circuit is as wide as its instructions, so the two idle qubits
+    # are not in it: the direct route has to widen the circuit before it can
+    # evolve a state wide enough to hold the terms.
+    assert qiskit_to_mimiq(qc).num_qubits() == 2
+
+    # ZZ on a Bell pair is +1, and qubits 2 and 3 stay in |0>, so IZII and
+    # ZIII read +1 each.
+    got = _assert_routes_agree(
+        [(qc, SparsePauliOp(["IIZZ", "IZII", "ZIII"], [1.0, 1.0, 1.0]))]
+    )
+    np.testing.assert_allclose(float(got[0].data.evs), 3.0, atol=1e-9)
+
+
+@direct_terms
+def test_direct_terms_match_across_a_parameter_sweep():
+    """Each row is its own evolution, and the labels repeat across them."""
+    from qiskit.circuit import Parameter
+    from qiskit.quantum_info import SparsePauliOp
+
+    theta = Parameter("θ")
+    qc = QuantumCircuit(2)
+    qc.ry(theta, 0)
+    qc.cx(0, 1)
+
+    angles = [0.0, math.pi / 3, math.pi / 2, math.pi]
+    got = _assert_routes_agree(
+        [(qc, SparsePauliOp(["ZZ", "XX", "II"], [1.0, 0.5, 0.25]),
+          [[a] for a in angles])]
+    )
+    want = [
+        np.real(Statevector(qc.assign_parameters([a])).expectation_value(
+            SparsePauliOp(["ZZ", "XX", "II"], [1.0, 0.5, 0.25])
+        ))
+        for a in angles
+    ]
+    np.testing.assert_allclose(got[0].data.evs, want, atol=1e-9)
+
+
+@direct_terms
+def test_direct_terms_yield_to_a_stochastic_circuit():
+    """One evolution is not the ensemble, so the hook does not serve it."""
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(2, 1)
+    qc.h(0)
+    qc.measure(0, 0)
+    qc.cx(0, 1)
+
+    estimator = MimiqEstimatorV2(
+        MimiqBackend(_runner(), num_qubits=8), trajectories=64, seed=5
+    )
+    result = estimator.run([(qc, SparsePauliOp(["ZZ"]))]).result()[0]
+
+    assert result.metadata["stochastic"] is True
+    assert result.metadata["trajectories"] == 64
+    # A measured Bell pair is |00> or |11>, so ZZ is +1 on every trajectory.
+    np.testing.assert_allclose(float(result.data.evs), 1.0, atol=1e-9)
+
+
+@direct_terms
+def test_direct_terms_refuse_the_same_run_options():
+    """Driving the backend step by step accepts what submitting to it does.
+
+    `ExaqtQCS.execute` names no `fuse`, so the option is an error whichever
+    route the pub takes. A fast path that quietly accepted it would make the
+    option's meaning depend on the backend being local.
+    """
+    from qiskit.quantum_info import SparsePauliOp
+
+    qc = QuantumCircuit(2)
+    qc.h(0)
+
+    direct, pushed = _both_routes(run_options={"fuse": True})
+    errors = []
+    for estimator in (direct, pushed):
+        with pytest.raises(
+            ValueError, match="does not accept the run option"
+        ) as exc:
+            estimator.run([(qc, SparsePauliOp(["ZZ"]))]).result()
+        errors.append(str(exc.value))
+
+    assert errors[0] == errors[1]

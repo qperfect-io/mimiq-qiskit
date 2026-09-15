@@ -42,8 +42,9 @@ raises rather than returning one trajectory dressed up as an exact number.
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 
@@ -63,9 +64,29 @@ from mimiq_qiskit.observables import (
     split_identity,
 )
 
-__all__ = ["EstimatorConfig", "estimate_pub"]
+__all__ = ["EstimatorConfig", "TermValues", "estimate_pub"]
 
 METHODS = ("auto", "exact", "trajectories", "shots")
+
+
+class TermValues(NamedTuple):
+    """One evolved state's Pauli terms, read off it directly.
+
+    What an ``evaluate`` callable returns per circuit. See
+    :func:`estimate_pub` for when that callable is used.
+
+    ``values`` holds ``{label: value}`` for every label the circuit was asked
+    about. A complex value is accepted and its real part taken, as on the
+    operation route, since a Pauli string on a normalised state has a real
+    expectation value.
+    ``fidelities`` holds the evolution's fidelity as a one-element sequence,
+    and is empty where the backend reports none. It is named to match the
+    field ``QCSResults`` carries, so ``min_fidelity`` comes out the same way
+    on both paths.
+    """
+
+    values: Mapping[str, float]
+    fidelities: Sequence[float] = ()
 
 
 @dataclass(frozen=True)
@@ -140,6 +161,7 @@ def estimate_pub(
     pub: EstimatorPub,
     config: EstimatorConfig,
     run: Callable[[list, int], Sequence],
+    evaluate: Callable[[list], Sequence] | None = None,
 ) -> PubResult:
     """Estimate every observable in ``pub`` and package the result.
 
@@ -152,6 +174,17 @@ def estimate_pub(
             list of MIMIQ circuits and returning one result per circuit in the
             same order. Everything backend-specific (the connection, the
             simulator options, the seed) lives behind this callable.
+        evaluate: Optional fast path for a backend that can read Pauli terms
+            off an evolved state in its own process:
+            ``evaluate([(circuit, labels), ...]) -> list[TermValues]``, one
+            entry per circuit, in the same order. Where it is given, the terms
+            are never pushed onto the circuit as ``ExpectationValue``
+            operations, which saves building and walking them. It is used only
+            for a deterministic circuit, since one evolution is the whole
+            answer there; a stochastic circuit needs an evolution per
+            trajectory and goes through ``run`` as before. A remote backend
+            cannot serve this, so it stays optional and ``run`` remains the
+            only callable an estimator must provide.
 
     Returns:
         A :class:`~qiskit.primitives.containers.PubResult` whose ``evs`` and
@@ -170,9 +203,26 @@ def estimate_pub(
         precision = config.default_precision
 
     bindings, bc_param, bc_obs = _broadcast(pub)
+    # Convert once, on demand. The predicate below needs a MIMIQ circuit per
+    # binding, and so does the direct path; converting in both places doubled
+    # the cost of every pub, which a parameter sweep pays once per row.
+    #
+    # Memoised rather than converted up front, because the predicate has two
+    # short-circuits worth keeping: ``assume_stochastic`` decides without
+    # looking at a circuit at all, and ``any`` stops at the first binding that
+    # needs trajectories. Converting eagerly would pay for every binding in
+    # both cases, and the sampled path would then discard the lot, since it
+    # appends measurements on the Qiskit side and converts its own copies.
+    _converted: dict = {}
+
+    def converted(param_index):
+        if param_index not in _converted:
+            _converted[param_index] = qiskit_to_mimiq(bindings[param_index])
+        return _converted[param_index]
+
     stochastic = config.assume_stochastic or any(
-        _needs_trajectories(qiskit_to_mimiq(circuit))
-        for circuit in bindings.values()
+        _needs_trajectories(converted(param_index))
+        for param_index in bindings
     )
     method, budget = _resolve(config, precision, stochastic)
 
@@ -182,7 +232,8 @@ def estimate_pub(
         )
     else:
         evs, stds, fidelity, spent = _estimate_direct(
-            bindings, bc_param, bc_obs, budget, run
+            converted, bc_param, bc_obs, budget, run,
+            evaluate=None if stochastic else evaluate,
         )
 
     exact = method != "shots" and not stochastic
@@ -349,9 +400,22 @@ def _min_fidelity(results: Sequence) -> float | None:
 # ── direct evaluation ────────────────────────────────────────────────────
 
 
-def _estimate_direct(bindings, bc_param, bc_obs, trajectories, run):
-    """Read each Pauli term off the state, averaging over trajectories."""
+def _estimate_direct(
+    converted, bc_param, bc_obs, trajectories, run, evaluate=None
+):
+    """Read each Pauli term off the state, averaging over trajectories.
+
+    ``converted(param_index)`` returns the memoised MIMIQ circuit for a
+    parameter index. ``_by_binding`` yields each parameter index once, so each
+    circuit has a single consumer and mutating it in place is safe. Anything
+    that starts sharing these circuits has to copy first.
+
+    With ``evaluate`` given, the terms are handed to the backend beside the
+    circuit instead of being pushed onto it as operations, and each one comes
+    back as a value rather than as a z-register entry.
+    """
     circuits: list = []
+    label_sets: list = []
     plans: list = []
     for param_index, entries in _by_binding(bc_param, bc_obs).items():
         labels = list(
@@ -362,14 +426,21 @@ def _estimate_direct(bindings, bc_param, bc_obs, trajectories, run):
         slot = None
         zvar_of: dict[str, int] = {}
         if labels:
-            circuit = qiskit_to_mimiq(bindings[param_index])
-            zvar_of = push_pauli_terms(circuit, labels)
+            circuit = converted(param_index)
+            if evaluate is None:
+                zvar_of = push_pauli_terms(circuit, labels)
             slot = len(circuits)
             circuits.append(circuit)
+            label_sets.append(labels)
         for index, identity, terms in entries:
             plans.append((index, identity, terms, zvar_of, slot))
 
-    results = run(circuits, trajectories) if circuits else []
+    if not circuits:
+        results = []
+    elif evaluate is not None:
+        results = evaluate(list(zip(circuits, label_sets)))
+    else:
+        results = run(circuits, trajectories)
     if len(results) != len(circuits):
         raise ValueError(
             f"the backend returned {len(results)} results for "
@@ -383,6 +454,9 @@ def _estimate_direct(bindings, bc_param, bc_obs, trajectories, run):
         if slot is None:
             # An identity-only observable needs no evolution at all.
             evs[index] = identity
+            continue
+        if evaluate is not None:
+            evs[index] = _combine_values(results[slot].values, identity, terms)
             continue
         zstates = getattr(results[slot], "zstates", None)
         if not zstates:
@@ -400,6 +474,29 @@ def _estimate_direct(bindings, bc_param, bc_obs, trajectories, run):
         evs[index], stds[index] = average_trajectories(values)
 
     return evs, stds, _min_fidelity(results), spent
+
+
+def _combine_values(values, identity: float, terms) -> float:
+    """``identity + sum(c * Re<P>)`` over one circuit's evaluated terms.
+
+    The real part is taken here rather than trusted from the backend, exactly
+    as :func:`~mimiq_qiskit.observables.read_pauli_terms` does on the other
+    path. A Pauli string on a normalised state has a real expectation value,
+    so this discards only round-off, and it keeps the result assignable to the
+    float array the caller fills.
+    """
+    total = float(identity)
+    for label, coeff in terms.items():
+        try:
+            value = values[label]
+        except KeyError:
+            raise ValueError(
+                f"the backend evaluated no value for Pauli term {label!r}; "
+                "an evaluate callable must return one entry per label it was "
+                "given"
+            ) from None
+        total += coeff * complex(value).real
+    return total
 
 
 # ── sampled estimation ───────────────────────────────────────────────────

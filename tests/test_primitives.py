@@ -20,7 +20,10 @@ from qiskit.quantum_info import SparsePauliOp
 
 from mimiqcircuits import QCSResults
 
+from qiskit.primitives.containers.estimator_pub import EstimatorPub
+
 from mimiq_qiskit import MimiqBackend, MimiqEstimatorV2, MimiqSamplerV2
+from mimiq_qiskit.estimation import EstimatorConfig, TermValues, estimate_pub
 
 
 class _SamplerStub:
@@ -254,6 +257,89 @@ def test_estimator_parameter_broadcasting():
     assert len(stub.circuits) == 3
 
 
+def test_estimator_converts_each_binding_once(monkeypatch):
+    """Guards against converting every binding twice per pub.
+
+    Deciding whether the circuit is stochastic needs a MIMIQ circuit, and so
+    does reading the Pauli terms off the state. Converting separately for
+    each doubled the Qiskit-side cost of a pub, which a parameter sweep pays
+    once per row and which dominates the run well before the simulator does.
+    """
+    import mimiq_qiskit.estimation as estimation
+
+    calls = []
+    original = estimation.qiskit_to_mimiq
+
+    def counting(circuit):
+        calls.append(circuit)
+        return original(circuit)
+
+    monkeypatch.setattr(estimation, "qiskit_to_mimiq", counting)
+
+    t = Parameter("t")
+    qc = QuantumCircuit(1)
+    qc.rx(t, 0)
+
+    estimator = MimiqEstimatorV2(MimiqBackend(_EstimatorStub()))
+    bindings = [[0.0], [0.25], [0.5], [0.75], [1.0]]
+    # Two observables per binding, to pin that the count follows the number
+    # of distinct bindings rather than the number of output elements.
+    observables = [["Z"], ["X"]]
+    pub = (qc, observables, [bindings])
+    evs = estimator.run([pub]).result()[0].data.evs
+
+    assert evs.shape == (2, len(bindings))
+    assert len(calls) == len(bindings)
+
+
+def test_estimator_converts_nothing_it_cannot_use(monkeypatch):
+    """The stochastic predicate keeps both of its short-circuits.
+
+    ``assume_stochastic`` settles the question without looking at a circuit,
+    and ``any`` stops at the first binding that needs trajectories. Neither
+    conversion would be reused: the sampled path appends measurements on the
+    Qiskit side and converts its own copies, so a binding converted for the
+    predicate is work thrown away.
+    """
+    import mimiq_qiskit.estimation as estimation
+
+    calls = []
+    original = estimation.qiskit_to_mimiq
+    monkeypatch.setattr(
+        estimation,
+        "qiskit_to_mimiq",
+        lambda circuit: (calls.append(circuit), original(circuit))[1],
+    )
+
+    t = Parameter("t")
+    deterministic = QuantumCircuit(1)
+    deterministic.rx(t, 0)
+    # A reset makes the circuit end in an ensemble, so the predicate is true
+    # on the first binding it looks at.
+    stochastic = deterministic.copy()
+    stochastic.reset(0)
+
+    bindings = [[0.0], [0.25], [0.5], [0.75], [1.0]]
+    n = len(bindings)
+
+    # A noise model is invisible in the circuit, so `assume_stochastic` is set
+    # and the predicate never runs: only the sampled path converts.
+    calls.clear()
+    MimiqEstimatorV2(
+        MimiqBackend(_ShotStub("0")),
+        shots=8,
+        run_options={"noisemodel": object()},
+    ).run([(deterministic, [["Z"]], [bindings])]).result()
+    assert len(calls) == n
+
+    # Without the flag the predicate runs, but stops at the first binding.
+    calls.clear()
+    MimiqEstimatorV2(MimiqBackend(_ShotStub("0")), shots=8).run(
+        [(stochastic, [["Z"]], [bindings])]
+    ).result()
+    assert len(calls) == 1 + n
+
+
 # ── stochastic circuits ──────────────────────────────────────────────────
 
 
@@ -450,3 +536,238 @@ def test_sampler_rejects_a_short_result():
     sampler = MimiqSamplerV2(MimiqBackend(short_runner))
     with pytest.raises(ValueError, match="returned 5 samples"):
         sampler.run([qc], shots=10).result()
+
+
+# ── direct term evaluation (the optional `evaluate` hook) ──────────────
+
+
+class _ListEstimatorStub:
+    """`_EstimatorStub` at the `estimate_pub` seam: a list in, a list out."""
+
+    def __init__(self, fidelity: float = 1.0):
+        self.calls = 0
+
+    def __call__(self, circuits, nsamples):
+        self.calls += 1
+        return [
+            QCSResults(
+                simulator="stub",
+                version="0",
+                cstates=[],
+                zstates=[
+                    [complex(i + 1) for i in range(c.num_zvars())]
+                    for _ in range(max(nsamples, 1))
+                ],
+                fidelities=[1.0],
+                timings={},
+            )
+            for c in circuits
+        ]
+
+
+class _EvaluateStub:
+    """Answers the k-th label of each circuit with ``k + 1``.
+
+    Mirrors `_EstimatorStub`, which fills z[k] with k + 1, so the same pub
+    run through either path must come out the same.
+    """
+
+    def __init__(
+        self,
+        fidelity: float = 1.0,
+        drop: str | None = None,
+        imag: float = 0.0,
+    ):
+        self.requests = []
+        self._fidelity = fidelity
+        self._drop = drop
+        self._imag = imag
+
+    def __call__(self, requests):
+        self.requests.extend(requests)
+        return [
+            TermValues(
+                {
+                    label: complex(k + 1, self._imag) if self._imag else float(k + 1)
+                    for k, label in enumerate(labels)
+                    if label != self._drop
+                },
+                (self._fidelity,),
+            )
+            for _circuit, labels in requests
+        ]
+
+
+def _refuse_run(circuits, nsamples):
+    raise AssertionError("run must not be called when evaluate serves the pub")
+
+
+def _estimate(pub, config=None, run=_refuse_run, evaluate=None):
+    return estimate_pub(
+        EstimatorPub.coerce(pub, 0.0), config or EstimatorConfig(), run, evaluate
+    )
+
+
+def test_evaluate_serves_a_deterministic_pub():
+    """The terms go beside the circuit, not onto it, and `run` is untouched."""
+    ev = _EvaluateStub(fidelity=0.75)
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    qc.cx(0, 1)
+
+    result = _estimate((qc, [{"ZZ": 2.0, "XX": 1.0}]), evaluate=ev)
+
+    # ZZ is the first label (2.0 * 1) and XX the second (1.0 * 2).
+    assert list(result.data.evs) == [4.0]
+    assert list(result.data.stds) == [0.0]
+    assert result.metadata["min_fidelity"] == 0.75
+    circuit, labels = ev.requests[0]
+    assert labels == ["ZZ", "XX"]
+    assert circuit.num_zvars() == 0  # no ExpectationValue was pushed
+
+
+def test_evaluate_and_pushed_terms_agree():
+    """Both routes read the same terms, so they must report the same value."""
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    obs = [{"ZZ": 1.0}, {"ZZ": 2.0, "XX": 1.0, "II": 0.5}]
+
+    pushed = _estimate((qc, obs), run=_ListEstimatorStub())
+    direct = _estimate((qc, obs), evaluate=_EvaluateStub())
+
+    assert list(direct.data.evs) == list(pushed.data.evs)
+
+
+def test_evaluate_is_skipped_for_a_stochastic_circuit():
+    """One evolution is not the ensemble, so the hook does not serve it."""
+    ev = _EvaluateStub()
+    run = _ListEstimatorStub()
+    config = EstimatorConfig(trajectories=3)
+
+    result = _estimate(
+        (_mid_circuit_measurement(), "Z"), config=config, run=run, evaluate=ev
+    )
+
+    assert ev.requests == []
+    assert run.calls == 1
+    assert result.metadata["stochastic"] is True
+
+
+def test_evaluate_missing_a_label_raises():
+    ev = _EvaluateStub(drop="XX")
+    qc = QuantumCircuit(2)
+    qc.h(0)
+
+    with pytest.raises(ValueError, match="no value for Pauli term 'XX'"):
+        _estimate((qc, [{"ZZ": 1.0, "XX": 1.0}]), evaluate=ev)
+
+
+def test_evaluate_may_return_complex_values():
+    """`evs` is a float array, so the real part is taken here, not trusted.
+
+    A Pauli string on a normalised state has a real expectation value, but a
+    backend is free to hand back the complex number it computed; the operation
+    route takes `.real` off the z-register for the same reason.
+    """
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    obs = [{"ZZ": 2.0, "XX": 1.0}]
+
+    real = _estimate((qc, obs), evaluate=_EvaluateStub())
+    complexy = _estimate((qc, obs), evaluate=_EvaluateStub(imag=1e-16))
+
+    assert list(complexy.data.evs) == list(real.data.evs)
+    assert complexy.data.evs.dtype.kind == "f"
+
+
+# ── the site map behind a direct read ──────────────────────────────────
+
+
+def test_site_map_reads_a_permutation_base_off_its_values():
+    """0- and 1-based permutations both arrive; the values say which.
+
+    `apply_passes` composes as 1-based while every pass that ships today
+    emits 0-based, so the convention is read rather than assumed.
+    """
+    from mimiq_qiskit.local_terms import _site_map
+
+    zero_based = _site_map([[2, 0, 1]], 3)
+    assert [zero_based(q) for q in range(3)] == [2, 0, 1]
+
+    one_based = _site_map([[3, 1, 2]], 3)
+    assert [one_based(q) for q in range(3)] == [2, 0, 1]
+
+    assert [_site_map([None, None], 3)(q) for q in range(3)] == [0, 1, 2]
+
+
+def test_site_map_composes_the_passes_with_the_compile():
+    """A backend may relabel in both places, and the two have to compose.
+
+    exaqt reorders in the pass pipeline and tensorweaver inside `compile`,
+    so the map is built from whichever steps happened, in order.
+    """
+    from mimiq_qiskit.local_terms import _site_map
+
+    # 0 -> 1 -> 2, 1 -> 2 -> 0, 2 -> 0 -> 1.
+    site = _site_map([[1, 2, 0], [1, 2, 0]], 3)
+    assert [site(q) for q in range(3)] == [2, 0, 1]
+
+    # A step that changed nothing drops out.
+    assert [_site_map([None, [1, 2, 0]], 3)(q) for q in range(3)] == [1, 2, 0]
+
+
+def test_site_map_rejects_a_non_permutation():
+    from mimiq_qiskit.local_terms import _site_map
+
+    with pytest.raises(ValueError, match="not a permutation"):
+        _site_map([[0, 0, 2]], 3)
+
+
+# ── preparation knobs come from `execute`, not from a copy ─────────────
+
+
+def test_prep_kwargs_read_the_defaults_off_execute():
+    """A default lives on `execute`; this route reads it rather than repeating it.
+
+    Copying the literals would let the two routes prepare circuits
+    differently the day one of those defaults moves, with nothing to say so.
+    """
+    from mimiq_qiskit.local_terms import _PREP_KNOBS, _prep_kwargs
+
+    class _Backend:
+        def execute(
+            self,
+            circuit,
+            *,
+            nsamples=1000,
+            seed=None,
+            fuse=True,
+            fuse_threshold=7,
+            canonicaldecompose=True,
+            reorderqubits="greedy",
+            remove_swaps=True,
+        ):
+            raise AssertionError("not called")
+
+    assert _prep_kwargs(_Backend(), {}) == {
+        "fuse": True,
+        "fuse_threshold": 7,
+        "canonicaldecompose": True,
+        "reorderqubits": "greedy",
+        "remove_swaps": True,
+    }
+    # An option the caller set wins over the signature's default.
+    assert _prep_kwargs(_Backend(), {"fuse": False})["fuse"] is False
+    assert set(_prep_kwargs(_Backend(), {})) == set(_PREP_KNOBS)
+
+
+def test_prep_kwargs_reject_a_knob_with_no_default():
+    """Nothing to prepare with, so say which knob rather than guess one."""
+    from mimiq_qiskit.local_terms import _prep_kwargs
+
+    class _Backend:
+        def execute(self, circuit, *, fuse, **kwargs):
+            raise AssertionError("not called")
+
+    with pytest.raises(TypeError, match="no default for 'fuse'"):
+        _prep_kwargs(_Backend(), {})

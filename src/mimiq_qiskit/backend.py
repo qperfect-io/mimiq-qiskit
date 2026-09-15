@@ -206,6 +206,24 @@ def _rejected_options(execute, opts: dict) -> list[str]:
     return [k for k in opts if k not in params]
 
 
+def check_run_options(backend, opts: dict) -> dict:
+    """Drop the unset options and raise on any the backend cannot take.
+
+    Returns the options actually worth forwarding. Shared with
+    :mod:`mimiq_qiskit.local_terms` so that driving a backend step by step
+    accepts exactly the option set submitting to it does.
+    """
+    kwargs = {k: v for k, v in opts.items() if v is not None}
+    rejected = _rejected_options(backend.execute, kwargs)
+    if rejected:
+        raise ValueError(
+            f"{type(backend).__name__} does not accept the run "
+            f"option(s) {', '.join(sorted(rejected))}; they are "
+            "specific to other MIMIQ backends"
+        )
+    return kwargs
+
+
 def _backend_runner(backend) -> Callable:
     """Wrap a MIMIQ backend so a list of circuits is submitted as one job.
 
@@ -213,14 +231,7 @@ def _backend_runner(backend) -> Callable:
     and normalise the result back to a list of ``QCSResults``.
     """
     def call(circuits, *, nsamples, seed, **opts):
-        kwargs = {k: v for k, v in opts.items() if v is not None}
-        rejected = _rejected_options(backend.execute, kwargs)
-        if rejected:
-            raise ValueError(
-                f"{type(backend).__name__} does not accept the run "
-                f"option(s) {', '.join(sorted(rejected))}; they are "
-                "specific to other MIMIQ backends"
-            )
+        kwargs = check_run_options(backend, opts)
         results = backend.execute(
             list(circuits), nsamples=nsamples, seed=seed, **kwargs
         )
@@ -265,6 +276,10 @@ class MimiqBackend(BackendV2):
             backend_version=__version__,
         )
         self._runner = _coerce_runner(runner)
+        # Kept beside the coerced runner, not instead of it: a local backend
+        # can also be driven step by step, which the native estimator uses to
+        # read Pauli terms off the state. See `mimiq_qiskit.local_terms`.
+        self._mimiq_backend = runner
         self._num_qubits = num_qubits
         self._target = _build_target(num_qubits)
 

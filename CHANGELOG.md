@@ -7,7 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-15
+
+### Added
+- `estimate_pub` takes an optional `evaluate` callable, for a backend that can
+  read Pauli terms off an evolved state in its own process. Where it is given,
+  the terms are handed over beside the circuit instead of being pushed onto it
+  as `ExpectationValue` operations, so nothing downstream has to build, push,
+  or walk them. Measured through `TensorWeaverEstimator` on a GHZ circuit with
+  one weight-1 observable per qubit, same values to the last bit: 3.57 ms
+  against 1.72 ms at 24 qubits, 10.42 ms against 7.76 ms at 100. The win is in
+  the term handling, so it shrinks as the evolution itself grows.
+- `TermValues`, what an `evaluate` callable returns per circuit: the values it
+  read, and the evolution's fidelity so `min_fidelity` is reported the same way
+  on both paths. A value may be complex; its real part is taken, as the
+  operation route already does with the z-register.
+- `MimiqEstimatorV2` now serves that hook itself. Wrapping a local MIMIQ
+  backend that advertises `expectation_state` — exaqt, for one — it evolves a
+  deterministic circuit once and reads each term off the state, so no estimator
+  has to supply an `evaluate` of its own to get the shorter route. Measured on
+  exaqt with the single-conversion fix also applied, a 20-row parameter sweep
+  of a two-layer RY/CX ansatz with every single and pairwise Z term: 20.2 ms
+  against 10.9 at 8 qubits (36 terms), 39.4 ms against 22.4 at 12 (78 terms),
+  205 ms against 175 at 16 (136 terms). Values are unchanged to the last bit;
+  the saving is in the term handling, so it shrinks as the evolution itself
+  grows.
+- `mimiq_qiskit.local_terms`, where that lives: `supports_direct_terms` says
+  whether a backend qualifies and `local_evaluator` builds the callable. It is
+  the backend-agnostic half of the work — prepare, evolve, map each term onto
+  the layout the backend chose — so an estimator that is not
+  `MimiqEstimatorV2` can use it too, as `TensorWeaverEstimator` does. Backends
+  differ on where a qubit relabelling happens, in the pass pipeline or inside
+  `compile`, so both are composed rather than either being assumed.
+- `backend.check_run_options`, the run-option validation `MimiqBackend` already
+  did before submitting, now shared so that driving a backend step by step
+  accepts exactly the option set submitting to it does.
+
+### Changed
+- `estimate_pub` converts each binding once instead of twice. It converted
+  every bound circuit to decide whether the pub was stochastic, discarded the
+  result, then converted the same circuits again to estimate them. The
+  conversion is memoised, which keeps the two short-circuits the predicate
+  relies on: `assume_stochastic` decides without converting anything, and
+  `any` stops at the first binding that needs trajectories.
+- The direct route reads the circuit-preparation defaults off `execute`'s
+  signature instead of repeating them, so a default that moves there moves on
+  both routes.
+- `evaluate` serves deterministic circuits only. A stochastic one needs an
+  evolution per trajectory and still goes through `run`, so `run` stays the
+  only callable an estimator must provide and a remote backend is unaffected.
+
 ## [0.3.0] — 2026-09-04
+
+Three changes can break existing calls to `MimiqEstimatorV2`.
+
+A circuit that ends in an ensemble rather than a state (a mid-circuit
+measurement, a reset, a noise model) used to return a number and now raises
+unless given a budget. That number was one random trajectory reported as
+exact, so code relying on it was reading noise; pass `trajectories=N` to
+average the ensemble, `shots=N` to estimate it the way hardware does, or a
+positive `precision` to size either. `method="exact"` restores the old
+single-trajectory read, with a warning.
+
+Read the constructor's precision through `default_precision` rather than the
+`precision` property, and the result metadata's through `target_precision`
+rather than `precision`. Both now match the names Qiskit's own estimators
+use.
 
 ### Fixed
 - `MimiqEstimatorV2` no longer reports a single trajectory as an exact
@@ -61,8 +126,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   observables on one circuit cost one MIMIQ job, not five.
 - Estimator result metadata reports `target_precision` rather than
   `precision`, matching Qiskit's own estimators.
-- `MimiqEstimatorV2.precision` is replaced by `default_precision`, settable
-  in the constructor, again matching Qiskit's estimators.
+
+### Removed
+- `MimiqEstimatorV2.precision`, which only ever returned the constant `0.0`.
+  Use `default_precision`, settable in the constructor, matching Qiskit's own
+  estimators.
 
 ## [0.2.0] — 2026-08-20
 

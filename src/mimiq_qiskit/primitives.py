@@ -41,6 +41,7 @@ from qiskit.primitives.containers.sampler_pub import SamplerPub
 from mimiq_qiskit.backend import MimiqBackend
 from mimiq_qiskit.converter import qiskit_to_mimiq
 from mimiq_qiskit.estimation import EstimatorConfig, estimate_pub
+from mimiq_qiskit.local_terms import local_evaluator, supports_direct_terms
 
 
 def _as_backend(backend) -> MimiqBackend:
@@ -171,6 +172,15 @@ class MimiqEstimatorV2(BaseEstimatorV2):
     :mod:`mimiq_qiskit.estimation` documents the three methods and how
     ``method="auto"`` chooses between them.
 
+    Against a *local* backend that advertises ``expectation_state``, a
+    deterministic circuit takes a shorter route: it is evolved once and each
+    term is read off the resulting state, so the terms never become
+    ``ExpectationValue`` operations and nothing has to build, submit or walk
+    them. Values are unchanged; the saving is in the term handling, so it is
+    largest where the evolution itself is cheap. A remote backend, and any
+    circuit that needs an evolution per trajectory, go the portable way. See
+    :mod:`mimiq_qiskit.local_terms`.
+
     Args:
         backend: A :class:`MimiqBackend`, or anything it can wrap.
         method: ``"auto"`` (default), ``"exact"``, ``"trajectories"``, or
@@ -229,6 +239,16 @@ class MimiqEstimatorV2(BaseEstimatorV2):
             # circuit, so nothing else can tell that the run is stochastic.
             assume_stochastic=self._run_opts.get("noisemodel") is not None,
         )
+        # A local backend can be evolved once and queried, which skips the
+        # per-term operations entirely. `estimate_pub` uses this only where
+        # one evolution is the whole answer; everything else still goes
+        # through `_submit`.
+        runner = self._backend._mimiq_backend
+        self._evaluate = (
+            local_evaluator(runner, self._run_opts, self._seed)
+            if supports_direct_terms(runner)
+            else None
+        )
 
     @property
     def default_precision(self) -> float:
@@ -251,7 +271,10 @@ class MimiqEstimatorV2(BaseEstimatorV2):
 
     def _run(self, pubs) -> PrimitiveResult:
         return PrimitiveResult(
-            [estimate_pub(pub, self._config, self._submit) for pub in pubs],
+            [
+                estimate_pub(pub, self._config, self._submit, self._evaluate)
+                for pub in pubs
+            ],
             metadata={"version": 2},
         )
 
