@@ -51,6 +51,33 @@ def _as_backend(backend) -> MimiqBackend:
     return MimiqBackend(backend)
 
 
+def _bits_from_cstates(cstates, shots: int, index: int) -> np.ndarray:
+    """``(shots, num_bits)`` booleans from one result's classical states.
+
+    One ``bitarray.unpack`` expands a whole cstate in C. Reading them a bit
+    at a time from Python is what made packing a wide register cost more
+    than the simulation that produced it.
+    """
+    # A BitArray has a fixed shot axis, so a runner that returns a different
+    # number of samples than asked for cannot be packed into it. Say so,
+    # rather than reading off the end of the list.
+    if len(cstates) < shots:
+        raise ValueError(
+            f"MIMIQ returned {len(cstates)} samples for circuit {index} "
+            f"but {shots} shots were requested; the sampler cannot "
+            "pack a short result"
+        )
+    if shots == 0:
+        return np.zeros((0, 0), dtype=bool)
+    # A cstate is a `BitString` from a MIMIQ backend and a bare `bitarray`
+    # from a plain runner; both wrap the same buffer.
+    buf = b"".join(
+        getattr(cstate, "bits", cstate).unpack(zero=b"\x00", one=b"\x01")
+        for cstate in cstates[:shots]
+    )
+    return np.frombuffer(buf, dtype=np.uint8).reshape(shots, -1).astype(bool)
+
+
 def _register_bitarray(qcs_list, shape, clbit_indices, reg_size, shots):
     """Pack one classical register's samples into a ``BitArray``.
 
@@ -59,30 +86,19 @@ def _register_bitarray(qcs_list, shape, clbit_indices, reg_size, shots):
     MIMIQ classical-bit index feeding bit ``j`` of the register (bit 0 is
     the least significant), matching Qiskit's LSB-first register packing.
     """
-    num_bytes = (reg_size + 7) // 8
-    arr = np.zeros(tuple(shape) + (shots, num_bytes), dtype=np.uint8)
-    flat = arr.reshape((-1, shots, num_bytes))
+    arr = np.zeros(tuple(shape) + (shots, reg_size), dtype=bool)
+    flat = arr.reshape((-1, shots, reg_size))
 
     for i, qcs in enumerate(qcs_list):
-        cstates = qcs.cstates
-        # A BitArray has a fixed shot axis, so a runner that returns a
-        # different number of samples than asked for cannot be packed into
-        # it. Say so, rather than reading off the end of the list.
-        if len(cstates) < shots:
-            raise ValueError(
-                f"MIMIQ returned {len(cstates)} samples for circuit {i} "
-                f"but {shots} shots were requested; the sampler cannot "
-                "pack a short result"
-            )
-        for s in range(shots):
-            cstate = cstates[s]
-            value = 0
-            for j, g in enumerate(clbit_indices):
-                if g < len(cstate) and cstate[g]:
-                    value |= 1 << j
-            flat[i, s, :] = list(value.to_bytes(num_bytes, "big"))
+        bits = _bits_from_cstates(qcs.cstates, shots, i)
+        width = bits.shape[1]
+        # A result narrower than the register leaves the bits above it
+        # unset, rather than reading past the end of the classical state.
+        taken = [(j, g) for j, g in enumerate(clbit_indices) if g < width]
+        if taken:
+            flat[i][:, [j for j, _ in taken]] = bits[:, [g for _, g in taken]]
 
-    return BitArray(arr, reg_size)
+    return BitArray.from_bool_array(arr, order="little")
 
 
 class MimiqSamplerV2(BaseSamplerV2):

@@ -12,7 +12,7 @@ import threading
 
 import pytest
 from bitarray import bitarray
-from mimiqcircuits import QCSResults
+from mimiqcircuits import BitString, QCSResults
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.providers import JobStatus
 
@@ -124,6 +124,18 @@ def test_cstate_bit_order_is_lsb_first():
         shots=1,
     )
     assert result.get_counts() == {"01": 1}
+
+
+def test_cstate_hex_packing_matches_a_plain_iterable():
+    """`_cstate_to_hex` renders a `BitString` through its buffer in one
+    call and walks anything else a bit at a time. The two have to agree."""
+    from mimiq_qiskit.result import _cstate_to_hex
+
+    for pattern in ("", "0", "1", "10", "01", "1101001", "0" * 70 + "1"):
+        bits = [int(c) for c in pattern]
+        assert _cstate_to_hex(BitString(pattern or 0)) == _cstate_to_hex(bits)
+    assert _cstate_to_hex(BitString(0)) == "0x0"
+    assert _cstate_to_hex(BitString("10")) == "0x1"
 
 
 def test_result_reports_register_layout():

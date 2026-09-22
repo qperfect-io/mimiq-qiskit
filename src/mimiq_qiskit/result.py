@@ -22,7 +22,18 @@ from qiskit.result import Result
 
 def _cstate_to_hex(cstate: Iterable[int]) -> str:
     """Pack a MIMIQ classical state (bit i = clbit i) into a Qiskit hex
-    key (bit i = bit i of the integer)."""
+    key (bit i = bit i of the integer).
+
+    A `BitString` renders its whole buffer in one C call, which is worth
+    taking: this runs twice per shot on the `Result` path. Anything else
+    iterable is walked a bit at a time.
+    """
+    bits = getattr(cstate, "bits", None)
+    if bits is not None:
+        # `to01` puts clbit 0 first and `int(..., 2)` reads the most
+        # significant digit first, so the rendering is reversed.
+        text = bits.to01()
+        return hex(int(text[::-1], 2)) if text else "0x0"
     value = 0
     for i, bit in enumerate(cstate):
         if bit:

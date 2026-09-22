@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-22
+
+### Changed
+- `MimiqSamplerV2` packs its `BitArray`s through numpy. Each classical state
+  is expanded once with `bitarray.unpack` and the register's bits are taken as
+  one column selection, where every bit of every shot was previously read
+  through Python and shifted into an integer. GHZ 100 qubits, 1024 shots:
+  packing drops from 19.2 ms to 0.6 ms.
+- `Result` keys are rendered from the classical state's buffer rather than bit
+  by bit. `_cstate_to_hex` runs twice per shot on that path: 4.45 ms to
+  0.51 ms on the same case.
+
+### Fixed
+- The local term evaluator no longer raises `TypeError` for a backend whose
+  `execute` narrows the signature and does not name a preparation knob (exaqt
+  names none of them). A knob the concrete `execute` does not declare now
+  falls back to `LocalBackend.execute`'s own default, which is what the
+  submission it stands in for would have used. A knob declared without a
+  default still raises, since there is nothing to prepare with.
+
+### Build
+- `mimiqcircuits` is accepted at `>=0.26.7,<0.29`, with the suite run against
+  0.28.0. That release moves a circuit ending in measurements plus classical
+  logic onto the sampling path, so such a run reports one fidelity rather than
+  one per shot.
+
 ## [0.3.1] - 2026-09-15
 
 ### Added

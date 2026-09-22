@@ -12,6 +12,8 @@ against Qiskit's own reference.
 
 from __future__ import annotations
 
+from inspect import signature
+
 import pytest
 from bitarray import bitarray
 from qiskit import QuantumCircuit
@@ -759,6 +761,30 @@ def test_prep_kwargs_read_the_defaults_off_execute():
     # An option the caller set wins over the signature's default.
     assert _prep_kwargs(_Backend(), {"fuse": False})["fuse"] is False
     assert set(_prep_kwargs(_Backend(), {})) == set(_PREP_KNOBS)
+
+
+def test_prep_kwargs_fall_back_to_the_base_class_for_a_knob_execute_omits():
+    """A backend may narrow `execute` to the knobs it implements.
+
+    exaqt names none of the preparation knobs. A knob its `execute` does
+    not take is one it cannot set either, so the value that stands in for
+    the submission is what `LocalBackend.execute` would have resolved with,
+    not a TypeError.
+    """
+    from mimiqcircuits.backends import LocalBackend
+
+    from mimiq_qiskit.local_terms import _PREP_KNOBS, _prep_kwargs
+
+    class _Backend:
+        def execute(self, circuit, *, nsamples=1000, seed=None):
+            raise AssertionError("not called")
+
+    base = signature(LocalBackend.execute).parameters
+    resolved = _prep_kwargs(_Backend(), {})
+    assert set(resolved) == set(_PREP_KNOBS)
+    assert resolved == {knob: base[knob].default for knob in _PREP_KNOBS}
+    # An option the caller set still wins.
+    assert _prep_kwargs(_Backend(), {"fuse": False})["fuse"] is False
 
 
 def test_prep_kwargs_reject_a_knob_with_no_default():

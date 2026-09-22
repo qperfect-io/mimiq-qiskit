@@ -1,6 +1,6 @@
 [project]
 name = "mimiq-qiskit"
-version = "0.3.1"
+version = "0.3.2"
 description = "Qiskit BackendV2 bridge for MIMIQ: run Qiskit circuits on MIMIQ cloud or local MIMIQ simulators."
 readme = "README.md"
 authors = [{ name = "QPerfect", email = "technical@qperfect.io" }]
@@ -16,14 +16,16 @@ requires-python = ">=3.10"
 # back into a method in a patch release, which broke this package while
 # the constraint still claimed to accept it.
 #
-# The range spans two minors because the suite has been run against both.
+# The range spans three minors because the suite has been run against each.
 # 0.27's one new operation, `GateCustomDiagonal`, is covered by the
 # reverse converter's matrix fallback (see the tests named for it), and
-# it is what `fuse_circuit` now emits for an all-diagonal block. Widen a
-# bound only after the suite has run against the new version, in the
-# release that does so, and never on the strength of resolution alone.
+# it is what `fuse_circuit` now emits for an all-diagonal block. 0.28 moves
+# a circuit ending in measurements plus classical logic onto the sampling
+# path, which this package only sees as fewer `fidelities`. Widen a bound
+# only after the suite has run against the new version, in the release
+# that does so, and never on the strength of resolution alone.
 dependencies = [
-    "mimiqcircuits>=0.26.7,<0.28",
+    "mimiqcircuits>=0.26.7,<0.29",
     "qiskit>=2.0,<3",
     # Matching the range mimiqcircuits itself declares, since it owns this
     # compatibility claim and its floor of 1.26 is what actually resolves.

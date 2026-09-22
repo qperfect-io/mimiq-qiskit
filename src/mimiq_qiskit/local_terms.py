@@ -71,6 +71,14 @@ _PREP_KNOBS = (
 )
 
 
+@lru_cache(maxsize=1)
+def _base_execute_params():
+    """``LocalBackend.execute``'s parameters, where the knob defaults live."""
+    from mimiqcircuits.backends import LocalBackend
+
+    return signature(LocalBackend.execute).parameters
+
+
 def _prep_kwargs(backend, opts: dict) -> dict:
     """The preparation knobs to pass, with ``execute``'s defaults filled in.
 
@@ -88,16 +96,24 @@ def _prep_kwargs(backend, opts: dict) -> dict:
         One entry per knob in :data:`_PREP_KNOBS`.
 
     Raises:
-        TypeError: If ``execute`` neither takes a knob nor defaults it, which
-            leaves no value to prepare with.
+        TypeError: If neither ``execute`` nor ``LocalBackend.execute``
+            defaults a knob, which leaves no value to prepare with.
     """
     params = signature(backend.execute).parameters
+    base = _base_execute_params()
     kwargs = {}
     for knob in _PREP_KNOBS:
         if knob in opts:
             kwargs[knob] = opts[knob]
             continue
-        default = params[knob].default if knob in params else Parameter.empty
+        if knob in params:
+            default = params[knob].default
+        else:
+            # A backend may narrow `execute` to the knobs it implements.
+            # One it does not name is one its own `execute` cannot set
+            # either, so what stands in for the submission is what the base
+            # class would have resolved with.
+            default = base[knob].default if knob in base else Parameter.empty
         if default is Parameter.empty:
             raise TypeError(
                 f"{type(backend).__name__}.execute declares no default for "
