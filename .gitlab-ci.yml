@@ -106,20 +106,16 @@ publish-python:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/
   before_script:
-    # twine 7 refuses --skip-existing against anything but PyPI itself, and
-    # this uploads to the GitLab registry: "does not have support for the
-    # following features: --skip-existing". Pinned below it to keep a tag
-    # pipeline re-runnable.
     - pip install "uv>=0.11,<0.12" "twine>=6,<7"
   script:
     - *add-mimiqcircuits-python
     - uv sync
     - uv build
-    # --skip-existing lets re-runs of a tag pipeline succeed when the
-    # wheel was already uploaded on a previous attempt.
+    # No --skip-existing: twine refuses it for any index but PyPI. A re-run
+    # of an already published tag fails on the duplicate upload instead.
     - >
       TWINE_PASSWORD=${CI_JOB_TOKEN}
       TWINE_USERNAME=gitlab-ci-token
-      twine upload --skip-existing
+      twine upload --non-interactive
       --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi
       dist/*

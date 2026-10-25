@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-26
+
+### CI
+- The tag pipeline uploads to the internal package index without `--skip-existing`, which twine refuses for any index but PyPI.
+
 ## [0.4.0] - 2026-10-25
 
 ### Added
