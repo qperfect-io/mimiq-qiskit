@@ -59,8 +59,8 @@ def _term_operator(label: str):
     )
 
 
-#: The circuit-preparation knobs ``_resolve_prep_passes`` takes. It requires
-#: every one of them and holds no defaults of its own: those belong to
+#: The circuit-preparation knobs ``resolve_pipeline`` takes. Each is passed
+#: explicitly with ``execute``'s default, since those defaults belong to
 #: ``execute``, which is what the portable route calls.
 _PREP_KNOBS = (
     "fuse",
@@ -68,6 +68,7 @@ _PREP_KNOBS = (
     "canonicaldecompose",
     "reorderqubits",
     "remove_swaps",
+    "simplify",
 )
 
 
@@ -196,7 +197,11 @@ def local_evaluator(
     """
     import mimiqcircuits as mc
     from mimiqcircuits.backends.fidelity import as_lower_bound
-    from mimiqcircuits.backends.passes import PassContext, apply_passes
+    from mimiqcircuits.backends.passes import (
+        PassContext,
+        apply_passes,
+        resolve_pipeline,
+    )
 
     # The backend and the options are both fixed here, so the pipeline they
     # mean is too. Resolved on the first batch rather than now, so that an
@@ -208,13 +213,11 @@ def local_evaluator(
         if not resolved:
             # A backend names the options it implements, and the two routes
             # have to agree on that list: an option `execute` would refuse
-            # cannot quietly work here instead. `_resolve_prep_passes` is what
+            # cannot quietly work here instead. `resolve_pipeline` is what
             # `execute` itself calls, so both read the knobs the same way.
             opts = check_run_options(backend, run_opts)
             resolved.append(
-                backend._resolve_prep_passes(
-                    None, **_prep_kwargs(backend, opts)
-                )
+                resolve_pipeline(backend, None, **_prep_kwargs(backend, opts))
             )
         return resolved[0]
 

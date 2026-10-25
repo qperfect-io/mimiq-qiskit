@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
+### Added
+- `run` and the primitives accept the `simplify` run option, forwarded to
+  `mimiqcircuits` 0.30's `execute(simplify=...)`: on a local backend it
+  reduces the circuit while keeping its unitary exactly, and the local
+  estimator route prepares circuits with it too. The cloud refuses it for
+  now, and a backend whose `execute` does not take it raises `ValueError`.
+
+### Changed
+- Follows `mimiqcircuits` 0.29 and later, whose preparation flags default to
+  `None` and adjust the backend's own pipeline instead of replacing it. Run
+  options follow: `run(qc, reorderqubits=False)` on a local backend turns off the
+  backend's default reordering and keeps its other passes, and
+  `reorderqubits=True` installs the backend's own reorder pass. The local
+  estimator route reads those defaults off `execute` as before, so it
+  prepares circuits the same way the submission does.
+- `reorderqubits` is no longer documented as cloud-only: Exaqt and
+  TensorWeaver run it locally.
+- Requires `mimiqcircuits` 0.30 or newer within 0.30.
+
 ## [0.3.2] - 2026-09-22
 
 ### Changed

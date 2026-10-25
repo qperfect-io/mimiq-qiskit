@@ -4,7 +4,7 @@
 # - test: pytest on every push to main/devel and every MR, twice: against
 #         unreleased `mimiqcircuits` from GitLab (early warning on
 #         cross-repo breakage) and against the released version the lock
-#         file pins from PyPI (what published users actually get). The
+#         file pins (what published users actually get). The
 #         suite includes simulation tests that need `mimiq-exaqt`, which
 #         `uv sync` installs from the dev dependency group; they skip
 #         themselves if it is unavailable.
@@ -45,8 +45,8 @@ test-python:
     - uv sync
     - uv run pytest -sxv
 
-# Same suite against the released `mimiqcircuits` from PyPI, resolved from
-# the committed lock file. Without this, CI only ever exercises the
+# Same suite against the released `mimiqcircuits`, resolved from the
+# committed lock file. Without this, CI only ever exercises the
 # unreleased dependency and the published package can drift out of sync
 # with the version users install.
 test-python-released:

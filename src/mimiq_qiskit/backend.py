@@ -92,6 +92,7 @@ _RUN_OPTION_KEYS = (
     "canonicaldecompose",
     "reorderqubits",
     "remove_swaps",
+    "simplify",
     "bonddim",
     "entdim",
     "mpscutoff",
@@ -255,8 +256,8 @@ class MimiqBackend(BackendV2):
     Beyond ``shots`` and ``seed``, ``run`` accepts MIMIQ-specific options
     which are forwarded to MIMIQ when set: the circuit-preparation knobs
     ``fuse``, ``fuse_threshold``, ``canonicaldecompose``,
-    ``reorderqubits``, ``remove_swaps``, and the simulator/job settings
-    ``bonddim``, ``entdim``, ``mpscutoff``, ``mpsmethod``,
+    ``reorderqubits``, ``remove_swaps``, ``simplify``, and the simulator/job
+    settings ``bonddim``, ``entdim``, ``mpscutoff``, ``mpsmethod``,
     ``mpotraversal``, ``timelimit``, ``noisemodel``, ``label``.
     """
 

@@ -62,7 +62,19 @@ Circuit preparation happens before the state is evolved:
   into wider blocks, skipping circuits narrower than the threshold.
 - ``canonicaldecompose`` — decompose the circuit to MIMIQ's canonical
   gate basis.
-- ``reorderqubits``, ``remove_swaps`` — cloud-only layout passes.
+- ``reorderqubits`` — relabel qubits so interacting ones sit close
+  together. ``True`` asks for the backend's default search, a name such as
+  ``"greedy"`` or ``"sa"`` pins one, ``False`` turns it off.
+- ``remove_swaps`` — rewrite trailing swaps into a relabelling (cloud only).
+- ``simplify`` — reduce the circuit while keeping its unitary exactly
+  (cancel inverses, merge rotations, resynthesize small blocks). Off unless
+  asked for; local backends only, the cloud refuses it for now.
+
+On a local backend each of these adjusts the backend's own preparation
+rather than replacing it: an option left unset keeps what the backend does
+by default, ``False`` drops that pass, and any other value installs the
+backend's own pass of that kind. So ``backend.run(qc, reorderqubits=False)``
+turns off the backend's default reordering, and keeps everything else.
 
 The rest tune the simulator or the job itself: ``bonddim``, ``entdim``,
 ``mpscutoff``, ``mpsmethod``, ``mpotraversal`` for the MPS engine, plus

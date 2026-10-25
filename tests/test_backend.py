@@ -164,7 +164,8 @@ def test_run_options_forwarded_to_mimiq():
     qc.measure(0, 0)
 
     backend.run(
-        qc, shots=5, bonddim=16, timelimit=30, fuse=True, fuse_threshold=4
+        qc, shots=5, bonddim=16, timelimit=30, fuse=True, fuse_threshold=4,
+        simplify=True,
     ).result()
     kwargs = rec.calls[0][3]
     assert kwargs["bonddim"] == 16
@@ -172,6 +173,7 @@ def test_run_options_forwarded_to_mimiq():
     # Circuit-preparation knobs travel the same path.
     assert kwargs["fuse"] is True
     assert kwargs["fuse_threshold"] == 4
+    assert kwargs["simplify"] is True
     # Unset options are not forwarded.
     assert "noisemodel" not in kwargs
     assert "canonicaldecompose" not in kwargs

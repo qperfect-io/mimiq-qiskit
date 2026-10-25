@@ -699,7 +699,7 @@ wheels = [
 
 [[package]]
 name = "mimiq-qiskit"
-version = "0.3.2"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "mimiqcircuits" },
@@ -723,7 +723,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mimiqcircuits", specifier = ">=0.26.7,<0.29" },
+    { name = "mimiqcircuits", specifier = ">=0.30.0,<0.31" },
     { name = "numpy", specifier = ">=1.26,<3" },
     { name = "qiskit", specifier = ">=2.0,<3" },
 ]
@@ -741,7 +741,7 @@ docs = [
 
 [[package]]
 name = "mimiqcircuits"
-version = "0.28.0"
+version = "0.30.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bitarray" },
@@ -755,9 +755,18 @@ dependencies = [
     { name = "sympy" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/45/a5/7f69f35c5c1b2944ec6bb0df68099b3d853c46dc5c4690e55598182606fc/mimiqcircuits-0.28.0.tar.gz", hash = "sha256:e2652f44879370f0982652d74312dca86af8b458b5fea322f606a963f2827a3d", size = 2645722, upload-time = "2026-09-22T19:07:08.254Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/3a/52143e1c59eccf3eb845ee258928c37a4d5bb9f36fadb9ed05cf3e7ee5f4/mimiqcircuits-0.30.0.tar.gz", hash = "sha256:e3a23946b8ecd0f0aa7fe626ae7e81a54ea97521f3080b5146a884988c06b722", size = 2730374, upload-time = "2026-10-24T11:14:20.105Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/ab/6398a87e70be2ed3a3cc24254e98185c230be16c11ff8ef5eebdd79c3107/mimiqcircuits-0.28.0-py3-none-any.whl", hash = "sha256:65425f9496bd8569c7bacf1fc8298a01af35ac87393710d04f225e2f7358635d", size = 451488, upload-time = "2026-09-22T19:07:10.443Z" },
+    { url = "https://files.pythonhosted.org/packages/76/cf/739a57ef933e318d5e5422aab198206ec5fe05157a542b34f062e982417a/mimiqcircuits-0.30.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:3b79e4727ce5fa873a343e6c26a99936208647508c0892f3c161d6d2d1832599", size = 974257, upload-time = "2026-10-24T11:14:08.076Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/cb/cc86b1c0742189404010346e18438b7e4795ce1620ab16ca0e69810339f7/mimiqcircuits-0.30.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:ee3b15a2010c8ff755185ad323645a561c3785802cd064b7d7287271960961da", size = 953639, upload-time = "2026-10-24T11:14:09.784Z" },
+    { url = "https://files.pythonhosted.org/packages/04/e4/749117a7b5faeb4237928ec4c59cf5063d67a96560e8f277a77d95aa3bec/mimiqcircuits-0.30.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:9e9db5b561cee298cb81a477860a6dbd115b2d87fcc5aad540432b5e622bc3e4", size = 977409, upload-time = "2026-10-24T11:14:10.901Z" },
+    { url = "https://files.pythonhosted.org/packages/62/8b/96313c90a8d11fa93d0bbecea63e54efde1145d86ebfd6128a89897423de/mimiqcircuits-0.30.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:61cd800b95d1fb82d2fbfb5340d34faccc009f44488d366def236925652cf1d5", size = 993066, upload-time = "2026-10-24T11:14:12.234Z" },
+    { url = "https://files.pythonhosted.org/packages/43/d7/f3303b50e16327d11cb1fad340f29e499f92dcbfb54475d35d95c1c1913e/mimiqcircuits-0.30.0-cp310-abi3-win_amd64.whl", hash = "sha256:a035a95e8748aea9300de762a5c163a72e50f3dee9faa954ba30adb14f333f65", size = 912494, upload-time = "2026-10-24T11:14:13.349Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/3c/36f287af7c08a49037bd00a06b350d3ef2bd38111e6354629b9c2166234a/mimiqcircuits-0.30.0-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:d82528c68cf375280409d7185fea44121640be99472ae941478dabebf5b36135", size = 974782, upload-time = "2026-10-24T11:14:14.607Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/a9/70b9a19c71ae776483f8111e1e389f25cdf4b8599d5e81a51f0b8a822d7f/mimiqcircuits-0.30.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:06beaed4e0eeaf07f801e9da81abd80b4267674e62d8420dd2efc0a6bf7ecd79", size = 950224, upload-time = "2026-10-24T11:14:15.751Z" },
+    { url = "https://files.pythonhosted.org/packages/80/62/bc4898218f206666c6c42ee1ae19776f09089093536c805488cd6eaed7e1/mimiqcircuits-0.30.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:556e2000b0bd5a923a632ea35a7dd5bdee1e79f84fc16a61868745fa03576f26", size = 974531, upload-time = "2026-10-24T11:14:16.775Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/79/5fc9ed64e3f61796a65e29586afb3916a3239a398c2849545c5aca8de53b/mimiqcircuits-0.30.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:8172eee01fcb3184c7455c99668454e3a23a4d0e0527f14c79620a9b2cf8c9c9", size = 990982, upload-time = "2026-10-24T11:14:17.879Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/da/28579a90322424e0e91afc3b3d1f34b699607bb35c2ca2c1bde6be0ad9a5/mimiqcircuits-0.30.0-cp314-cp314t-win_amd64.whl", hash = "sha256:b1bbf9a0eef6ff049019b0bc3ab799b4bfd10fb147e6a6c1d10f3c4b4c704004", size = 909269, upload-time = "2026-10-24T11:14:18.997Z" },
 ]
 
 [[package]]

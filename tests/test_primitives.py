@@ -705,8 +705,9 @@ def test_site_map_reads_a_permutation_base_off_its_values():
 def test_site_map_composes_the_passes_with_the_compile():
     """A backend may relabel in both places, and the two have to compose.
 
-    exaqt reorders in the pass pipeline and tensorweaver inside `compile`,
-    so the map is built from whichever steps happened, in order.
+    Exaqt and TensorWeaver reorder in the pass pipeline, but a backend's
+    `compile` may relabel too, so the map is built from whichever steps
+    happened, in order.
     """
     from mimiq_qiskit.local_terms import _site_map
 
@@ -748,6 +749,7 @@ def test_prep_kwargs_read_the_defaults_off_execute():
             canonicaldecompose=True,
             reorderqubits="greedy",
             remove_swaps=True,
+            simplify=True,
         ):
             raise AssertionError("not called")
 
@@ -757,6 +759,7 @@ def test_prep_kwargs_read_the_defaults_off_execute():
         "canonicaldecompose": True,
         "reorderqubits": "greedy",
         "remove_swaps": True,
+        "simplify": True,
     }
     # An option the caller set wins over the signature's default.
     assert _prep_kwargs(_Backend(), {"fuse": False})["fuse"] is False
@@ -766,8 +769,7 @@ def test_prep_kwargs_read_the_defaults_off_execute():
 def test_prep_kwargs_fall_back_to_the_base_class_for_a_knob_execute_omits():
     """A backend may narrow `execute` to the knobs it implements.
 
-    exaqt names none of the preparation knobs. A knob its `execute` does
-    not take is one it cannot set either, so the value that stands in for
+    A knob its `execute` does not take is one it cannot set either, so the value that stands in for
     the submission is what `LocalBackend.execute` would have resolved with,
     not a TypeError.
     """
