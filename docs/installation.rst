@@ -18,7 +18,7 @@ From source:
 Runtime dependencies:
 
 - Python >= 3.10
-- `mimiqcircuits <https://pypi.org/project/mimiqcircuits/>`_ >= 0.26.7, < 0.28
+- `mimiqcircuits <https://pypi.org/project/mimiqcircuits/>`_ >= 0.31.1, < 0.32
 - `qiskit <https://www.ibm.com/quantum/qiskit>`_ >= 2.0, < 3
 - numpy >= 1.26, < 3
 
@@ -30,10 +30,7 @@ across minors — and it has been a real break: 0.26.7 changed
 ``GateCustom.matrix`` from an attribute back into a method in a *patch*
 release.
 
-The ``mimiqcircuits`` range covers two minors because the suite runs
-against both. 0.27's one new operation, ``GateCustomDiagonal``, needs
-nothing here: it is a unitary, so :func:`~mimiq_qiskit.mimiq_to_qiskit`
-picks it up through the matrix fallback described in :doc:`conversion`.
+The same range is declared in ``pyproject.toml``; the two are kept together.
 
 Bounds widen only once the test suite has run against the new version, so
 a release that raises one says so in the changelog. To try an unreleased

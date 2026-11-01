@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-01
+
+### Changed
+- Requires mimiqcircuits 0.31.
+
 ## [0.4.1] - 2026-10-26
 
 ### CI
