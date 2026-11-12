@@ -342,6 +342,101 @@ def test_estimator_converts_nothing_it_cannot_use(monkeypatch):
     assert len(calls) == 1 + n
 
 
+def _ops_per_qubit(circuit):
+    return {
+        circuit.find_bit(q).index: [
+            (inst.operation.name, tuple(circuit.find_bit(b).index for b in inst.qubits))
+            for inst in circuit.data
+            if q in inst.qubits
+        ]
+        for q in circuit.qubits
+    }
+
+
+@pytest.mark.parametrize("seed", range(50))
+def test_strip_final_measurements_matches_qiskit(seed):
+    """Removes exactly what ``remove_final_measurements`` removes.
+
+    Random circuits with measurements and barriers dropped at random
+    positions, so some are final without being last in the list.
+    """
+    import numpy as np
+    from qiskit.circuit.random import random_circuit
+
+    from mimiq_qiskit.estimation import _strip_final_measurements
+
+    rng = np.random.default_rng(seed)
+    qc = random_circuit(5, 6, measure=False, seed=seed)
+    qc.add_bits(QuantumCircuit(0, 5).clbits)
+    for _ in range(4):
+        q = int(rng.integers(5))
+        pos = int(rng.integers(len(qc.data) + 1))
+        name = "measure" if rng.random() < 0.7 else "barrier"
+        sub = QuantumCircuit(qc.qubits, qc.clbits)
+        sub.measure(q, q) if name == "measure" else sub.barrier(q)
+        qc.data.insert(pos, sub.data[0])
+    qc.barrier()
+    qc.measure(range(3), range(3))
+
+    expected = qc.remove_final_measurements(inplace=False)
+    assert _ops_per_qubit(_strip_final_measurements(qc)) == _ops_per_qubit(expected)
+
+
+def test_strip_final_measurements_keeps_the_gate_order():
+    """The gates come out in the order they were written.
+
+    ``remove_final_measurements`` re-emits them in DAG order, and the
+    simulators' cost depends on the order.
+    """
+    from mimiq_qiskit.estimation import _strip_final_measurements
+
+    qc = QuantumCircuit(3, 3)
+    qc.h(2)
+    qc.x(0)
+    qc.measure(0, 0)  # final, though gates follow it in the list
+    qc.cx(2, 1)
+    qc.h(2)
+    qc.measure(1, 1)
+    qc.barrier()
+    qc.measure(2, 2)
+
+    out = _strip_final_measurements(qc)
+    assert [(i.operation.name, [out.find_bit(q).index for q in i.qubits]) for i in out.data] == [
+        ("h", [2]),
+        ("x", [0]),
+        ("cx", [2, 1]),
+        ("h", [2]),
+    ]
+
+    plain = QuantumCircuit(2)
+    plain.x(0)
+    plain.h(1)
+    assert _strip_final_measurements(plain) is plain
+
+
+def test_estimator_strips_measurements_once_per_pub(monkeypatch):
+    """Final measurements are removed once, not once per binding."""
+    import mimiq_qiskit.estimation as estimation
+
+    calls = []
+    original = estimation._strip_final_measurements
+    monkeypatch.setattr(
+        estimation,
+        "_strip_final_measurements",
+        lambda circuit: (calls.append(circuit), original(circuit))[1],
+    )
+
+    t = Parameter("t")
+    qc = QuantumCircuit(1, 1)
+    qc.rx(t, 0)
+    qc.measure(0, 0)
+
+    estimator = MimiqEstimatorV2(MimiqBackend(_EstimatorStub()))
+    bindings = [[0.0], [0.25], [0.5]]
+    estimator.run([(qc, "Z", bindings)]).result()
+    assert len(calls) == 1
+
+
 # ── stochastic circuits ──────────────────────────────────────────────────
 
 

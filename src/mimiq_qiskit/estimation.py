@@ -356,20 +356,51 @@ def _broadcast(pub: EstimatorPub):
 
     bc_param, bc_obs = np.broadcast_arrays(param_indices, observables)
 
+    # Binding only sets angles, so the final measurements are the same for
+    # every row: strip them once, not once per binding.
+    circuit = _strip_final_measurements(pub.circuit)
     bindings = {}
     for index in np.ndindex(*bc_param.shape):
         param_index = bc_param[index]
         if param_index not in bindings:
-            circuit = parameter_values.bind(pub.circuit, param_index)
-            # An estimator pub carries state preparation, not readout. Qiskit
-            # says it should hold no measurements at all; drop any trailing
-            # ones rather than letting them collapse the state we are about to
-            # measure. Mid-circuit measurements are part of the state
-            # preparation and stay.
-            bindings[param_index] = circuit.remove_final_measurements(
-                inplace=False
-            )
+            bindings[param_index] = parameter_values.bind(circuit, param_index)
     return bindings, bc_param, bc_obs
+
+
+def _strip_final_measurements(circuit):
+    """Drop the final measurements and barriers, keeping the gate order.
+
+    An estimator pub carries state preparation, not readout. Qiskit says it
+    should hold no measurements at all; drop any final ones rather than
+    letting them collapse the state we are about to measure. Mid-circuit
+    measurements are part of the state preparation and stay.
+
+    A measurement or barrier is final when every later operation on its
+    qubits is also a final measurement or barrier, the rule of Qiskit's
+    ``RemoveFinalMeasurements``. Unlike ``remove_final_measurements``, this
+    does not round-trip through a DAG, which re-emits the gates in a
+    different order, and the simulators' cost depends on that order. Unused
+    classical bits are kept: the estimator never reads them.
+
+    A circuit without measurements is returned as is, final barriers
+    included, since they do not change the state.
+    """
+    if "measure" not in circuit.count_ops():
+        return circuit
+    closed = set()
+    kept = []
+    for inst in reversed(circuit.data):
+        if inst.operation.name in ("measure", "barrier") and closed.isdisjoint(
+            inst.qubits
+        ):
+            continue
+        closed.update(inst.qubits)
+        kept.append(inst)
+    out = circuit.copy_empty_like()
+    for inst in reversed(kept):
+        # Every instruction was already validated in `circuit`.
+        out._append(inst)
+    return out
 
 
 def _by_binding(bc_param, bc_obs):

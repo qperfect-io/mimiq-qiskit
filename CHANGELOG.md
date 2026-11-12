@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-12
+
+### Fixed
+- The estimators strip final measurements once per pub instead of once per
+  parameter binding, which made a sweep of a shallow circuit up to 1.9x slower
+  than the simulator alone.
+- The estimators keep the gates in the order they were written. Stripping
+  final measurements went through a DAG and re-emitted them in a different
+  order, which changed the simulation cost.
+
 ## [0.4.2] - 2026-11-01
 
 ### Changed
