@@ -18,7 +18,7 @@ From source:
 Runtime dependencies:
 
 - Python >= 3.10
-- `mimiqcircuits <https://pypi.org/project/mimiqcircuits/>`_ >= 0.31.1, < 0.32
+- `mimiqcircuits <https://pypi.org/project/mimiqcircuits/>`_ >= 0.32.0, < 0.33
 - `qiskit <https://www.ibm.com/quantum/qiskit>`_ >= 2.0, < 3
 - numpy >= 1.26, < 3
 

@@ -605,6 +605,23 @@ def test_estimator_emulated_shot_noise_perturbs_an_exact_value():
     assert noisy_result.metadata["exact"] is False
 
 
+def test_estimator_emulated_shot_noise_differs_between_pubs():
+    """Two pubs of one job get independent noise; the job is reproducible."""
+    qc = QuantumCircuit(1)
+    qc.h(0)
+
+    def evs():
+        estimator = MimiqEstimatorV2(
+            MimiqBackend(_EstimatorStub()), emulate_shot_noise=True, seed=7
+        )
+        result = estimator.run([(qc, "Z"), (qc, "Z")], precision=0.1).result()
+        return [float(pub.data.evs) for pub in result]
+
+    first, second = evs()
+    assert first != second
+    assert evs() == [first, second]
+
+
 def test_sampler_accepts_raw_runner():
     # A non-MimiqBackend argument is wrapped automatically.
     sampler = MimiqSamplerV2(_SamplerStub())

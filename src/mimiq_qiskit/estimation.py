@@ -162,6 +162,7 @@ def estimate_pub(
     config: EstimatorConfig,
     run: Callable[[list, int], Sequence],
     evaluate: Callable[[list], Sequence] | None = None,
+    rng: np.random.Generator | None = None,
 ) -> PubResult:
     """Estimate every observable in ``pub`` and package the result.
 
@@ -185,6 +186,10 @@ def estimate_pub(
             trajectory and goes through ``run`` as before. A remote backend
             cannot serve this, so it stays optional and ``run`` remains the
             only callable an estimator must provide.
+        rng: Generator of the ``emulate_shot_noise`` noise. A caller that
+            estimates several pubs passes the same one to each, so that their
+            noise is independent. Without it, the pub gets a generator seeded
+            with ``config.seed``.
 
     Returns:
         A :class:`~qiskit.primitives.containers.PubResult` whose ``evs`` and
@@ -238,7 +243,8 @@ def estimate_pub(
 
     exact = method != "shots" and not stochastic
     if exact and config.emulate_shot_noise and precision > 0:
-        rng = np.random.default_rng(config.seed)
+        if rng is None:
+            rng = np.random.default_rng(config.seed)
         # `normal` returns a scalar for a 0-d input, so put the shape back.
         evs = np.asarray(rng.normal(evs, precision), dtype=float).reshape(
             evs.shape

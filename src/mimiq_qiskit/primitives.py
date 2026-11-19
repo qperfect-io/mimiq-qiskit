@@ -286,9 +286,14 @@ class MimiqEstimatorV2(BaseEstimatorV2):
         return job
 
     def _run(self, pubs) -> PrimitiveResult:
+        # One generator for the whole job: a generator per pub would give
+        # every pub the same emulated shot noise.
+        rng = np.random.default_rng(self._config.seed)
         return PrimitiveResult(
             [
-                estimate_pub(pub, self._config, self._submit, self._evaluate)
+                estimate_pub(
+                    pub, self._config, self._submit, self._evaluate, rng
+                )
                 for pub in pubs
             ],
             metadata={"version": 2},

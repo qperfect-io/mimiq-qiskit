@@ -1,6 +1,6 @@
 [project]
 name = "mimiq-qiskit"
-version = "0.4.3"
+version = "0.5.0"
 description = "Qiskit BackendV2 bridge for MIMIQ: run Qiskit circuits on MIMIQ cloud or local MIMIQ simulators."
 readme = "README.md"
 authors = [{ name = "QPerfect", email = "technical@qperfect.io" }]
@@ -16,12 +16,12 @@ requires-python = ">=3.10"
 # back into a method in a patch release, which broke this package while
 # the constraint still claimed to accept it.
 #
-# The floor is 0.31.1, the release the suite last ran against. The same
+# The floor is 0.32.0, the release the suite last ran against. The same
 # range is stated in docs/installation.rst; keep the two together.
 # Widen a bound only after the suite has run against the new version, in the
 # release that does so, and never on the strength of resolution alone.
 dependencies = [
-    "mimiqcircuits>=0.31.1,<0.32",
+    "mimiqcircuits>=0.32.0,<0.33",
     "qiskit>=2.0,<3",
     # Matching the range mimiqcircuits itself declares, since it owns this
     # compatibility claim and its floor of 1.26 is what actually resolves.

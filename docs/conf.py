@@ -46,4 +46,14 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "furo"
 html_title = f"mimiq-qiskit {release}"
-html_static_path = ["_static"] if os.path.isdir("_static") else []
+html_static_path = ["_static"]
+html_css_files = [
+    "mimiq/fonts.css",
+    "mimiq/furo.css",
+]
+html_theme_options = {
+    # The logo already names the project.
+    "light_logo": "logo.svg",
+    "dark_logo": "logo-dark.svg",
+    "sidebar_hide_name": True,
+}

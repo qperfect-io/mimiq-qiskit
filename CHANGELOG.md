@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-19
+
+### Changed
+- Requires mimiqcircuits 0.32. Results of a seeded run differ from earlier versions, since mimiqcircuits derives its random streams from a seed differently.
+
+### Fixed
+- `MimiqEstimatorV2` with `emulate_shot_noise` and a `seed` draws independent noise for each pub of a job; every pub used to get the same noise.
+
+### Docs
+- The documentation uses the MIMIQ v4 brand: the new logo, the QPerfect colours in light and dark mode, and fonts served with the docs instead of from Google Fonts.
+
 ## [0.4.3] - 2026-11-12
 
 ### Fixed
