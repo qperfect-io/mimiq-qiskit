@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-19
+
+### Build
+- The lock file used for development, CI and the docs moves to the latest versions within the declared bounds, including the patched certifi, urllib3 and soupsieve.
+
 ## [0.5.0] - 2026-11-19
 
 ### Changed
